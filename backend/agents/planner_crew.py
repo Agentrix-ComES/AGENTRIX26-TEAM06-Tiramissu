@@ -49,25 +49,36 @@ Available well-known coordinates:
 
 INSTRUCTIONS:
 1. Review the user's constraints: Budget (LKR), Time (Hours), Interests, Origin location.
-2. Use the `search_tourist_pois` tool to find real tourist spots matching the user's interests near their origin or along their route.
-   - Pass the user's origin coordinates as lat/lon
-   - Use a radius of 5000-10000 meters
-   - Pass the user's interests, budget, and time_available
-   - Optionally pass start_lat/start_lon for distance calculation from user's starting point
-3. Select 2 to 4 POIs from the search results that fit the criteria.
+2. Review the "Available Nearby Tourist POIs" provided in the prompt.
+3. Select 2 to 4 POIs from that list that best fit the criteria.
 4. Return the structured itinerary with these POIs as stops.
 5. DO NOT worry about the exact travel duration or geometry; the backend will calculate the exact driving routes and add them. Just provide a reasonable sequence of stops.
 6. The total cost should not exceed the user's budget.
 7. If there are disruptions reported, route AROUND them.
-8. If search_tourist_pois returns no results, use your knowledge of popular Sri Lankan attractions.
+8. If the POI list is empty, use your knowledge of popular Sri Lankan attractions.
 """
 
 async def plan_smart_itinerary(request: SmartItineraryRequest) -> SmartItineraryResponse:
-    # 1. Get knowledge
+    # 1. Get knowledge & POIs
     try:
-        knowledge = search_cultural_knowledge(request.interests)
+        knowledge = search_cultural_knowledge.invoke({"query": request.interests})
     except Exception:
         knowledge = "No additional cultural knowledge found."
+
+    try:
+        pois_json = search_tourist_pois.invoke({
+            "lat": request.origin_lat,
+            "lon": request.origin_lon,
+            "radius": 10000,
+            "interests": request.interests,
+            "budget": request.budget_lkr,
+            "time_available": request.time_hours,
+            "start_lat": request.origin_lat,
+            "start_lon": request.origin_lon
+        })
+    except Exception as e:
+        logger.warning(f"POI search failed: {e}")
+        pois_json = "[]"
 
     user_msg = (
         f"Origin: {request.origin_lat},{request.origin_lon}\n"
@@ -75,6 +86,7 @@ async def plan_smart_itinerary(request: SmartItineraryRequest) -> SmartItinerary
         f"Time Available: {request.time_hours} hours\n"
         f"Interests: {request.interests}\n"
         f"Disruptions/News: {request.disruptions}\n\n"
+        f"Available Nearby Tourist POIs (choose from these):\n{pois_json}\n\n"
         f"Cultural Context:\n{knowledge}"
     )
 

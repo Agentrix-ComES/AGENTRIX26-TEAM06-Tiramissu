@@ -300,44 +300,4 @@ def search_tourist_pois(
     except Exception as exc:
         logger.warning(f"Overpass API failed: {exc}. Using fallback POIs.")
         return _generate_fallback_pois(dist_lat, dist_lon)
-    if "museum" in interests_lower:
-        query_filters.append('node["tourism"="museum"](around:{radius},{lat},{lon});')
-    if "food" in interests_lower or "restaurant" in interests_lower:
-        query_filters.append('node["amenity"="restaurant"](around:{radius},{lat},{lon});')
-    
-    # Default to general tourism if no specific filters
-    if not query_filters:
-        query_filters.append('node["tourism"](around:{radius},{lat},{lon});')
-        query_filters.append('way["tourism"](around:{radius},{lat},{lon});')
-        
-    query_body = "".join(query_filters).format(radius=radius, lat=lat, lon=lon)
-    overpass_query = f"[out:json][timeout:15];({query_body});out center 20;"
-    
-    try:
-        with httpx.Client(timeout=OVERPASS_TIMEOUT_SECONDS) as client:
-            headers = {"User-Agent": "TiramissuTravelBot/1.0", "Accept": "application/json"}
-            resp = client.post(OVERPASS_URL, data={"data": overpass_query}, headers=headers)
-            resp.raise_for_status()
-            data = resp.json()
-            
-        pois = []
-        for element in data.get("elements", []):
-            poi = _extract_poi_from_osm_element(element)
-            if poi:
-                # Filter by budget
-                if poi["cost_estimate_lkr"] > budget:
-                    continue
-                # Calculate exact distance from center
-                poi["dist_km"] = round(_haversine_distance(lat, lon, poi["lat"], poi["lon"]), 2)
-                pois.append(poi)
-                
-        # Sort by distance
-        pois.sort(key=lambda x: x["dist_km"])
-        
-        # Limit by time (e.g., 1 POI per 1.5 hours)
-        max_pois = max(1, int(time_available / 1.5))
-        return json.dumps(pois[:max_pois])
-        
-    except Exception as exc:
-        logger.warning(f"Overpass API failed: {exc}. Using fallback POIs.")
-        return _generate_fallback_pois(lat, lon)
+
