@@ -67,7 +67,7 @@ class _AuthSheetContentState extends State<_AuthSheetContent> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Heading
-                    Text('Ready to explore? 🌿',
+                    Text('Ready to explore Sri Lanka?',
                         style: AyuText.h2(color: AyuColors.navy).copyWith(
                             fontSize: 26.4, fontWeight: FontWeight.w800)),
                     const SizedBox(height: 4),

@@ -3,9 +3,9 @@ import '../theme/ayu_colors.dart';
 import '../theme/ayu_text_styles.dart';
 
 const _suggested = [
-  _SuggestData(name: 'Gangarama Temple', sub: '1.2 km away • Temple', tag: 'Popular', tagColor: AyuColors.lime),
-  _SuggestData(name: 'Galle Face Green', sub: '2.8 km away • Park', tag: 'Scenic', tagColor: AyuColors.sageAccent),
-  _SuggestData(name: 'National Museum', sub: '3.5 km away • Culture', tag: 'Must-see', tagColor: Color(0xFFFFD6A5)),
+  _SuggestData(name: 'Temple of the Sacred Tooth Relic', sub: '0.5 km away • Temple', tag: 'Popular', tagColor: AyuColors.lime),
+  _SuggestData(name: 'Kandy Lake', sub: '0.2 km away • Park', tag: 'Scenic', tagColor: AyuColors.sageAccent),
+  _SuggestData(name: 'Udawatta Kele Sanctuary', sub: '1.5 km away • Nature', tag: 'Must-see', tagColor: Color(0xFFFFD6A5)),
 ];
 
 class _SuggestData {
@@ -15,11 +15,10 @@ class _SuggestData {
 }
 
 const _turns = [
-  _Turn(dir: 'straight', label: 'Head north on Galle Road', dist: '0.4 km'),
-  _Turn(dir: 'right', label: 'Turn right onto R.A. de Mel Mawatha', dist: '1.1 km'),
-  _Turn(dir: 'straight', label: 'Continue onto Sir James Peiris Mawatha', dist: '0.8 km'),
-  _Turn(dir: 'left', label: 'Turn left at Lotus Tower roundabout', dist: '0.6 km'),
-  _Turn(dir: 'arrive', label: 'Arrive at Gangarama Temple', dist: ''),
+  _Turn(dir: 'straight', label: 'Head east on Dalada Vidiya', dist: '0.3 km'),
+  _Turn(dir: 'right', label: 'Turn right toward Kandy Lake', dist: '0.1 km'),
+  _Turn(dir: 'straight', label: 'Continue along the lake path', dist: '0.1 km'),
+  _Turn(dir: 'arrive', label: 'Arrive at Temple of the Sacred Tooth Relic', dist: ''),
 ];
 
 class _Turn {
@@ -41,9 +40,9 @@ class _RoutesScreenState extends State<RoutesScreen>
   bool _navigating = false;
   int _activeMode = 0;
   int _currentStep = 0;
-  String _destination = 'Gangarama Temple';
+  String _destination = 'Temple of the Sacred Tooth Relic';
   bool _showSuggestions = false;
-  final _destCtrl = TextEditingController(text: 'Gangarama Temple');
+  final _destCtrl = TextEditingController(text: 'Temple of the Sacred Tooth Relic');
   final _focusNode = FocusNode();
 
   // Animated dashed-line offset for route
@@ -153,7 +152,7 @@ class _RoutesScreenState extends State<RoutesScreen>
                             ),
                             const SizedBox(width: 12),
                             Expanded(
-                              child: Text('My Location — Colombo 3',
+                              child: Text('My Location — Kandy City Center',
                                   style: AyuText.body(
                                       color: AyuColors.textMuted, size: 14, weight: FontWeight.w500)),
                             ),

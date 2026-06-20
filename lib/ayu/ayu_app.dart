@@ -6,12 +6,13 @@ import 'screens/welcome_screen.dart';
 import 'screens/auth_sheet.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/guardian_screen.dart';
-import 'screens/routes_screen.dart';
+import 'screens/smart_route_map_screen.dart';
 import 'screens/alerts_screen.dart';
 import 'screens/profile_screen.dart';
+import 'screens/sight_glass_screen.dart';
 
 /// Screen names — mirrors the React SCREEN_DEPTH map.
-enum AyuScreen { welcome, dashboard, guardian, routes, alerts, profile }
+enum AyuScreen { welcome, dashboard, guardian, routes, alerts, profile, sightglass }
 
 const _depth = {
   AyuScreen.welcome: 0,
@@ -20,6 +21,7 @@ const _depth = {
   AyuScreen.routes: 2,
   AyuScreen.alerts: 2,
   AyuScreen.profile: 2,
+  AyuScreen.sightglass: 2,
 };
 
 /// Root of the AYU travel-companion app.
@@ -72,6 +74,7 @@ class _AyuNavigatorState extends State<AyuNavigator> {
       case 'guardian': return AyuScreen.guardian;
       case 'alerts':   return AyuScreen.alerts;
       case 'profile':  return AyuScreen.profile;
+      case 'sightglass': return AyuScreen.sightglass;
       default:         return AyuScreen.dashboard;
     }
   }
@@ -132,13 +135,16 @@ class _AyuNavigatorState extends State<AyuNavigator> {
         return GuardianScreen(onBack: _goBack);
 
       case AyuScreen.routes:
-        return RoutesScreen(onBack: _goBack);
+        return SmartRouteMapScreen(onBack: _goBack);
 
       case AyuScreen.alerts:
         return AlertsScreen(onBack: _goBack);
 
       case AyuScreen.profile:
         return ProfileScreen(onBack: _goBack);
+        
+      case AyuScreen.sightglass:
+        return SightGlassScreen(onBack: _goBack);
     }
   }
 }

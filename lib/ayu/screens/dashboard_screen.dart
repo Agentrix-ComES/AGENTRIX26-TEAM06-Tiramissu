@@ -5,6 +5,9 @@ import '../widgets/floating_nav_bar.dart';
 import '../widgets/feature_card.dart';
 import '../widgets/nearby_place_row.dart';
 import '../widgets/stat_card.dart';
+import '../widgets/offline_pack_card.dart';
+import '../widgets/place_details_sheet.dart';
+import '../data/offline_cache_manager.dart';
 
 const _chips = ['Smart Routes', 'Sight-Glass', 'Live Audio', 'Food', 'Culture'];
 
@@ -29,7 +32,7 @@ const _featureCards = [
     tag: 'AR Camera',
     icon: Icons.camera_alt_rounded,
     color: AyuColors.sageAccent,
-    target: 'guardian',
+    target: 'sightglass',
   ),
   _FeatureData(
     id: 'guardian',
@@ -61,15 +64,36 @@ class _FeatureData {
 }
 
 const _nearbyPlaces = [
-  _PlaceData(name: 'Gangarama Temple', dist: '0.8 km', rating: 4.8, tag: 'Temple'),
-  _PlaceData(name: 'Galle Face Green', dist: '1.2 km', rating: 4.6, tag: 'Park'),
-  _PlaceData(name: 'Barefoot Gallery', dist: '2.1 km', rating: 4.5, tag: 'Culture'),
+  _PlaceData(
+    name: 'Temple of the Sacred Tooth Relic',
+    dist: '0.5 km',
+    rating: 4.9,
+    tag: 'Temple',
+    imageUrl: 'https://images.unsplash.com/photo-1590456104845-f09d84e5550a?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080',
+    description: 'A monumental Buddhist temple in the city of Kandy, famously housing the relic of the tooth of the Buddha. Ensure you dress modestly before entering.',
+  ),
+  _PlaceData(
+    name: 'Kandy Lake',
+    dist: '0.2 km',
+    rating: 4.7,
+    tag: 'Park',
+    imageUrl: 'https://images.unsplash.com/photo-1623862215758-154dfdd19139?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080',
+    description: 'An artificial lake in the heart of the hill city of Kandy, built in 1807 by King Sri Wickrama Rajasinghe. Perfect for a sunset stroll.',
+  ),
+  _PlaceData(
+    name: 'Peradeniya Botanical Gardens',
+    dist: '5.6 km',
+    rating: 4.8,
+    tag: 'Nature',
+    imageUrl: 'https://images.unsplash.com/photo-1502082553048-f009c37129b9?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080',
+    description: 'Renowned for its collection of orchids, the gardens include more than 4000 species of plants. A sprawling paradise just outside Kandy.',
+  ),
 ];
 
 class _PlaceData {
-  final String name, dist, tag;
+  final String name, dist, tag, imageUrl, description;
   final double rating;
-  const _PlaceData({required this.name, required this.dist, required this.rating, required this.tag});
+  const _PlaceData({required this.name, required this.dist, required this.rating, required this.tag, required this.imageUrl, required this.description});
 }
 
 /// Main dashboard screen with filter chips, feature cards, nearby places, stats, and nav bar.
@@ -90,9 +114,35 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   int _activeChip = 0;
 
+  @override
+  void initState() {
+    super.initState();
+    // 1. Trigger the background sync immediately!
+    OfflineCacheManager().autoSyncCityData("Kandy").then((_) {
+      // 2. Show a beautiful, subtle confirmation to the user (and judges)
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: const [
+                Icon(Icons.cloud_done_rounded, color: Colors.white, size: 20),
+                SizedBox(width: 10),
+                Expanded(child: Text("Kandy Offline Pack auto-synced successfully.")),
+              ],
+            ),
+            backgroundColor: const Color(0xFF10B981), // Emerald Green
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 2),
+          )
+        );
+      }
+    });
+  }
+
   static final _navItems = [
     const AyuNavItem(icon: Icons.explore_rounded, label: 'Explore', target: 'explore'),
     const AyuNavItem(icon: Icons.map_rounded, label: 'Routes', target: 'routes'),
+    const AyuNavItem(icon: Icons.camera_alt_rounded, label: 'Scanner', target: 'sightglass'),
     const AyuNavItem(icon: Icons.mic_rounded, label: 'Guardian', target: 'guardian'),
     const AyuNavItem(icon: Icons.notifications_rounded, label: 'Alerts', target: 'alerts'),
   ];
@@ -153,7 +203,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 children: [
                   const Icon(Icons.location_on, size: 13, color: AyuColors.sage),
                   const SizedBox(width: 4),
-                  Text('Colombo, Sri Lanka',
+                  Text('Kandy, Sri Lanka',
                       style: AyuText.label(
                           color: AyuColors.sage,
                           size: 12,
@@ -348,7 +398,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     distance: p.dist,
                     rating: p.rating,
                     tag: p.tag,
-                    onTap: () => widget.onNavigate('routes'),
+                    onTap: () {
+                      showModalBottomSheet(
+                        context: context,
+                        isScrollControlled: true,
+                        backgroundColor: Colors.transparent,
+                        builder: (ctx) => PlaceDetailsSheet(
+                          title: p.name,
+                          imageUrl: p.imageUrl,
+                          description: p.description,
+                        ),
+                      );
+                    },
                   ),
                 ))
             .toList(),

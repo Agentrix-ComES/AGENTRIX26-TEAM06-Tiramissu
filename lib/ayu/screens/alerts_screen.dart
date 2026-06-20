@@ -45,13 +45,13 @@ const _levelConfig = {
 };
 
 List<AlertItem> _initialAlerts() => [
-  AlertItem(id: 1, level: AlertLevel.danger, title: 'Scam: Overpriced Tuk-Tuk Fare', body: 'Driver quoted LKR 5,000 for a 1.2 km trip. Local average is LKR 1,200. Declined successfully.', location: 'Pettah, Colombo 11', time: '2 min ago', read: false, quoted: 'LKR 5,000', fair: 'LKR 1,200'),
-  AlertItem(id: 2, level: AlertLevel.warning, title: 'Suspicious Gem Vendor', body: 'Common scam: vendors claim gems are from a government auction. These are tourist traps near Galle Face.', location: 'Galle Face Green', time: '1 hr ago', read: false),
-  AlertItem(id: 3, level: AlertLevel.safe, title: 'Fair Price Verified', body: 'Your tuk-tuk ride to Gangarama Temple was priced at LKR 1,100 — within the fair range.', location: 'Colombo 3 → Colombo 2', time: '3 hrs ago', read: true),
+  AlertItem(id: 1, level: AlertLevel.danger, title: 'Scam: Overpriced Tuk-Tuk Fare', body: 'Driver quoted LKR 5,000 for a 1.2 km trip. Local average is LKR 1,200. Declined successfully.', location: 'Kandy Market', time: '2 min ago', read: false, quoted: 'LKR 5,000', fair: 'LKR 1,200'),
+  AlertItem(id: 2, level: AlertLevel.warning, title: 'Suspicious Gem Vendor', body: 'Common scam: vendors claim gems are from a government auction. These are tourist traps near Kandy Lake.', location: 'Kandy Lake', time: '1 hr ago', read: false),
+  AlertItem(id: 3, level: AlertLevel.safe, title: 'Fair Price Verified', body: 'Your tuk-tuk ride to Temple of the Sacred Tooth Relic was priced at LKR 1,100 — within the fair range.', location: 'Kandy City Center → Temple', time: '3 hrs ago', read: true),
   AlertItem(id: 4, level: AlertLevel.danger, title: 'Scam: Fake Tour Guide', body: 'An unlicensed guide charged LKR 8,000 for a \'private tour\'. Licensed guides charge LKR 2,000–3,000.', location: 'Kelaniya Temple', time: 'Yesterday', read: true, quoted: 'LKR 8,000', fair: 'LKR 2,500'),
   AlertItem(id: 5, level: AlertLevel.info, title: 'Safety Tip: Night Travel', body: 'After 10 PM, use Uber or PickMe apps instead of street tuk-tuks — better safety & fixed pricing.', location: 'General Advice', time: 'Yesterday', read: true),
-  AlertItem(id: 6, level: AlertLevel.warning, title: 'Menu Overcharge at Restaurant', body: 'Sight-Glass detected tourist menu prices 3× higher than local menu at Colombo Fort area.', location: 'Colombo Fort', time: '2 days ago', read: true),
-  AlertItem(id: 7, level: AlertLevel.safe, title: 'Route Saved Successfully', body: 'Your route to Sigiriya Rock Fortress has been saved. Estimated travel: 3 hrs 40 min.', location: 'Colombo → Sigiriya', time: '2 days ago', read: true),
+  AlertItem(id: 6, level: AlertLevel.warning, title: 'Menu Overcharge at Restaurant', body: 'Sight-Glass detected tourist menu prices 3× higher than local menu at Kandy City Center area.', location: 'Kandy City Center', time: '2 days ago', read: true),
+  AlertItem(id: 7, level: AlertLevel.safe, title: 'Route Saved Successfully', body: 'Your route to Sigiriya Rock Fortress has been saved. Estimated travel: 3 hrs 40 min.', location: 'Kandy → Sigiriya', time: '2 days ago', read: true),
 ];
 
 /// Alerts & Scams screen — filterable expandable list.

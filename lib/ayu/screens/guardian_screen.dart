@@ -153,7 +153,7 @@ class _GuardianScreenState extends State<GuardianScreen>
             children: [
               Expanded(child: _ArCard(label: 'DISTANCE', value: '1.2 km', sub: 'Fort Station', icon: Icons.navigation_rounded)),
               const SizedBox(width: 10),
-              Expanded(child: _ArCard(label: 'LOCATION', value: 'Pettah', sub: 'Colombo 11', icon: Icons.location_on_rounded)),
+              Expanded(child: _ArCard(label: 'LOCATION', value: 'Kandy Market', sub: 'Kandy City', icon: Icons.location_on_rounded)),
               const SizedBox(width: 10),
               Expanded(
                 child: _ArCard(
