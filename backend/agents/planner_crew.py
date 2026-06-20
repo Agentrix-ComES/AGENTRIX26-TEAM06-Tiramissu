@@ -73,13 +73,17 @@ async def plan_smart_itinerary(request: SmartItineraryRequest) -> SmartItinerary
     )
 
     # 2. Get LLM structured plan
+    import asyncio
     try:
-        plan: SmartItineraryResponse = await _planner_llm.ainvoke([
-            SystemMessage(content=SYSTEM_PROMPT),
-            HumanMessage(content=user_msg)
-        ])
+        plan: SmartItineraryResponse = await asyncio.wait_for(
+            _planner_llm.ainvoke([
+                SystemMessage(content=SYSTEM_PROMPT),
+                HumanMessage(content=user_msg)
+            ]),
+            timeout=15.0
+        )
     except Exception as exc:
-        logger.exception("LLM Planner failed, using failsafe fallback")
+        logger.exception("LLM Planner failed or timed out, using failsafe fallback")
         plan = SmartItineraryResponse(
             total_cost_lkr=2000,
             total_duration_mins=0,
@@ -97,7 +101,7 @@ async def plan_smart_itinerary(request: SmartItineraryRequest) -> SmartItinerary
                     description="Failsafe route: Relaxing end to the trip in the capital."
                 )
             ],
-            transport_recommendation="Failsafe mode active (AI Quota Exceeded). Displaying popular fallback route computed purely by OSRM."
+            transport_recommendation="Failsafe mode active (AI Unavailable or Timeout). Displaying popular fallback route computed purely by OSRM."
         )
 
     # 3. Calculate actual routes using OSRM
@@ -114,8 +118,12 @@ async def plan_smart_itinerary(request: SmartItineraryRequest) -> SmartItinerary
             origin_str = f"{prev_lon},{prev_lat}"
             dest_str = f"{stop.lon},{stop.lat}"
             
-            osrm_json = calculate_osrm_fallback(origin_str, dest_str)
+            osrm_json = calculate_osrm_fallback.invoke({
+                "origin_coords": origin_str,
+                "dest_coords": dest_str
+            })
             if not osrm_json.startswith("Error"):
+                import json
                 osrm_data = json.loads(osrm_json)
                 total_travel_time += osrm_data.get("duration_min", 0)
                 
