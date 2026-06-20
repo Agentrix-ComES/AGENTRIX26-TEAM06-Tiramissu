@@ -1,3 +1,5 @@
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -24,6 +26,7 @@ class _SmartRouteMapScreenState extends State<SmartRouteMapScreen>
   // Input state
   double _budgetLkr = 2000;
   double _timeHours = 4;
+  final TextEditingController _originCtrl = TextEditingController();
   final TextEditingController _interestsCtrl = TextEditingController();
   final TextEditingController _disruptionsCtrl = TextEditingController();
 
@@ -57,22 +60,61 @@ class _SmartRouteMapScreenState extends State<SmartRouteMapScreen>
 
   @override
   void dispose() {
+    _originCtrl.dispose();
     _interestsCtrl.dispose();
     _disruptionsCtrl.dispose();
     super.dispose();
   }
 
+  Future<LatLng?> _geocodeOrigin(String query) async {
+    try {
+      final url = Uri.parse('https://nominatim.openstreetmap.org/search?q=${Uri.encodeComponent(query)}&format=json&limit=1');
+      final response = await http.get(url, headers: {'User-Agent': 'TiramissuTravelApp/1.0'});
+      if (response.statusCode == 200) {
+        final List data = jsonDecode(response.body);
+        if (data.isNotEmpty) {
+          return LatLng(double.parse(data[0]['lat']), double.parse(data[0]['lon']));
+        }
+      }
+    } catch (e) {
+      debugPrint('Geocoding error: $e');
+    }
+    return null;
+  }
+
   void _generateItinerary() async {
-    if (_userLocation == null) return;
+    LatLng? startLoc = _userLocation;
     
     setState(() {
       _isLoading = true;
       _errorMsg = null;
     });
 
+    if (_originCtrl.text.isNotEmpty) {
+      final geocoded = await _geocodeOrigin(_originCtrl.text);
+      if (geocoded != null) {
+        startLoc = geocoded;
+        _mapController.move(startLoc!, 13.0);
+      } else {
+        setState(() {
+          _errorMsg = 'Could not find that origin location.';
+          _isLoading = false;
+        });
+        return;
+      }
+    }
+
+    if (startLoc == null) {
+      setState(() {
+        _errorMsg = 'Origin location is required.';
+        _isLoading = false;
+      });
+      return;
+    }
+
     final resp = await ApiService.planSmartItinerary(
-      originLat: _userLocation!.latitude,
-      originLon: _userLocation!.longitude,
+      originLat: startLoc!.latitude,
+      originLon: startLoc!.longitude,
       budgetLkr: _budgetLkr.toInt(),
       timeHours: _timeHours.toInt(),
       interests: _interestsCtrl.text.isEmpty ? 'General sightseeing' : _interestsCtrl.text,
@@ -87,7 +129,7 @@ class _SmartRouteMapScreenState extends State<SmartRouteMapScreen>
           _showInputSheet = false;
           _parseGeometry();
           if (_routePoints.isNotEmpty) {
-            final bounds = LatLngBounds.fromPoints([_userLocation!, ..._routePoints]);
+            final bounds = LatLngBounds.fromPoints([startLoc!, ..._routePoints]);
             _mapController.fitCamera(CameraFit.bounds(bounds: bounds, padding: const EdgeInsets.all(40)));
           }
         } else {
@@ -343,6 +385,18 @@ class _SmartRouteMapScreenState extends State<SmartRouteMapScreen>
             activeColor: const Color(0xFFC6F621),
             onChanged: (v) => setState(() => _timeHours = v),
           ),
+          
+          TextField(
+            controller: _originCtrl,
+            style: const TextStyle(color: Colors.white),
+            decoration: InputDecoration(
+              labelText: 'Starting Location (Leave empty for GPS)',
+              labelStyle: const TextStyle(color: Colors.white54),
+              enabledBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Colors.white24)),
+              focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFFC6F621))),
+            ),
+          ),
+          const SizedBox(height: 12),
           
           TextField(
             controller: _interestsCtrl,

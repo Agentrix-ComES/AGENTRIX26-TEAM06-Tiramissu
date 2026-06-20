@@ -98,7 +98,7 @@ async def plan_smart_itinerary(request: SmartItineraryRequest) -> SmartItinerary
                 SystemMessage(content=SYSTEM_PROMPT),
                 HumanMessage(content=user_msg)
             ]),
-            timeout=15.0
+            timeout=45.0
         )
     except Exception as exc:
         logger.exception("LLM Planner failed or timed out, using failsafe fallback")
@@ -140,7 +140,7 @@ async def plan_smart_itinerary(request: SmartItineraryRequest) -> SmartItinerary
                 "origin_coords": origin_str,
                 "dest_coords": dest_str
             })
-            if not osrm_json.startswith("Error"):
+            if osrm_json.strip().startswith("{"):
                 import json
                 osrm_data = json.loads(osrm_json)
                 total_travel_time += osrm_data.get("duration_min", 0)
@@ -149,6 +149,8 @@ async def plan_smart_itinerary(request: SmartItineraryRequest) -> SmartItinerary
                 geom = osrm_data.get("geometry", {})
                 if geom.get("type") == "LineString":
                     merged_coords.extend(geom.get("coordinates", []))
+            else:
+                logger.warning(f"OSRM returned an error or no route: {osrm_json}")
             
             prev_lon = stop.lon
             prev_lat = stop.lat
