@@ -102,11 +102,52 @@ async def test_vision_agent():
     print("\nVISION AGENT: PASSED ✓\n")
 
 
+async def test_rag_retriever():
+    """Test the FAISS RAG retriever with domain-specific queries."""
+    print("=" * 60)
+    print("TEST 5: RAG Retriever (FAISS knowledge base)")
+    print("=" * 60)
+
+    from backend.rag.retriever import retrieve_knowledge
+
+    test_queries = [
+        ("hiring a tuk-tuk in Kandy", "transport"),
+        ("temple dress code rules", "etiquette"),
+        ("gem scam warning signs", "scam"),
+        ("train cancelled alternative transport", "transport"),
+        ("Sinhala phrase for how much", "phrases"),
+        ("Sigiriya Rock Fortress history", "landmark"),
+    ]
+
+    all_passed = True
+    for query, expected_topic in test_queries:
+        result = retrieve_knowledge(query, top_k=3)
+        passed = len(result) > 50  # should return real content
+        status = "✓" if passed else "✗ FAILED"
+        if not passed:
+            all_passed = False
+        print(f"  [{status}] Query: '{query}'")
+        print(f"          Result preview: {result[:100].strip()}...\n")
+
+    if all_passed:
+        print("RAG RETRIEVER: ALL PASSED ✓\n")
+    else:
+        print("RAG RETRIEVER: SOME TESTS FAILED — check vector store.\n")
+        print("  Tip: Run 'python -m backend.rag.ingest' to build the index.\n")
+
+
 async def main():
     print("\n>>> AGENT SMOKE TESTS\n")
 
     # Test 1 & 2: Tools (no LLM needed)
     await test_tools()
+
+    # Test 5: RAG retriever (no LLM needed — pure vector search)
+    try:
+        await test_rag_retriever()
+    except Exception as e:
+        print(f"RAG RETRIEVER FAILED: {e}\n")
+        print("  Tip: Run 'python -m backend.rag.ingest' first.\n")
 
     # Test 3: Route crew (needs Gemini API key)
     try:

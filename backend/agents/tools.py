@@ -78,11 +78,16 @@ def calculate_osrm_fallback(origin_coords: str, dest_coords: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Tool 2 — Cultural knowledge search (MOCKED)
+# Tool 2 — Cultural knowledge search (RAG-powered via FAISS)
 # ---------------------------------------------------------------------------
-# NOTE: This is a placeholder. Member 2 will replace the body with a real
-# Supabase pgvector similarity search once the embeddings table is live.
+# Bhagya's RAG retriever replaces the previous mock dictionary.
+# The retriever queries a FAISS vector store built from local .md knowledge
+# files in backend/rag/data/. To rebuild the index after updating the docs:
+#     python -m backend.rag.ingest
 # ---------------------------------------------------------------------------
+from backend.rag.retriever import retrieve_knowledge
+
+
 @tool
 def search_cultural_knowledge(query: str) -> str:
     """Search the local cultural knowledge base for tips relevant to
@@ -94,53 +99,5 @@ def search_cultural_knowledge(query: str) -> str:
     Returns:
         Matching cultural tips and phonetic Sinhala phrases.
     """
-    # ── MOCK DATA — DO NOT connect to Supabase here ──────────────────────
-    mock_knowledge = {
-        "default": (
-            "In Sri Lanka, always start bargaining with a warm smile. "
-            "Ask for a 30% discount initially. Use the phrase "
-            "'Mata aduiyak denne puluwan da?' (Can you give me a good price?). "
-            "If hiring a tuk-tuk, agree on the fare BEFORE getting in. "
-            "A reasonable rate is roughly LKR 60-80 per kilometre. "
-            "Say 'Kiyada?' (How much?) to open the negotiation."
-        ),
-        "tuk-tuk": (
-            "For tuk-tuk hire: Say 'Kiyada?' (කියද?) meaning 'How much?'. "
-            "Follow with 'Eka godak wadi' (That's too much). "
-            "Offer 60% of the quoted price and settle around 70-75%. "
-            "Always confirm the destination by showing it on a map. "
-            "Tip: Ask your hotel for the 'normal' fare to calibrate."
-        ),
-        "temple": (
-            "Temple etiquette: Remove shoes and hats before entry. "
-            "Dress modestly — cover shoulders and knees. "
-            "Walk clockwise around stupas. Never pose with your back "
-            "to a Buddha statue. Say 'Ayubowan' (Long life to you) "
-            "as a respectful greeting to monks."
-        ),
-        "train": (
-            "Sri Lankan trains are scenic but unreliable. Delays of "
-            "1-3 hours are common on the hill-country line. "
-            "If your train is cancelled, head to the bus stand — "
-            "private buses run the same routes more frequently. "
-            "Say 'Me bus eka koheda yanné?' (Where does this bus go?) "
-            "to confirm the destination."
-        ),
-        "food": (
-            "Street food is safe at busy stalls with high turnover. "
-            "Try 'kottu roti' and 'hoppers'. Vegetarian options are "
-            "plentiful — ask for 'elawalu' (vegetables). "
-            "Say 'Kanna deyak tiyenawa da?' (Do you have food?)."
-        ),
-    }
-
-    query_lower = query.lower()
-
-    # Simple keyword match against mock categories
-    for key, knowledge in mock_knowledge.items():
-        if key != "default" and key in query_lower:
-            logger.info("Cultural knowledge mock hit: category=%s", key)
-            return knowledge
-
-    logger.info("Cultural knowledge mock: returning default tips")
-    return mock_knowledge["default"]
+    logger.info("RAG retrieval triggered: query='%s'", query)
+    return retrieve_knowledge(query, top_k=3)
