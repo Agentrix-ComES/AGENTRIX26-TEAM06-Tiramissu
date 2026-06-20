@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../theme/ayu_colors.dart';
 import '../theme/ayu_text_styles.dart';
+import '../services/api_service.dart';
 
 const _suggested = [
   _SuggestData(name: 'Gangarama Temple', sub: '1.2 km away • Temple', tag: 'Popular', tagColor: AyuColors.lime),
@@ -43,6 +44,8 @@ class _RoutesScreenState extends State<RoutesScreen>
   int _currentStep = 0;
   String _destination = 'Gangarama Temple';
   bool _showSuggestions = false;
+  bool _isLoading = false;
+  String? _apiError;
   final _destCtrl = TextEditingController(text: 'Gangarama Temple');
   final _focusNode = FocusNode();
 
@@ -437,6 +440,12 @@ class _RoutesScreenState extends State<RoutesScreen>
                               children: [
                                 Text(_destination,
                                     style: AyuText.h3()),
+                                if (_apiError != null)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 4),
+                                    child: Text(_apiError!,
+                                        style: AyuText.label(color: AyuColors.danger, size: 12)),
+                                  ),
                                 Row(
                                   children: [
                                     const Icon(Icons.star_rounded,
@@ -541,8 +550,31 @@ class _RoutesScreenState extends State<RoutesScreen>
                       const SizedBox(height: 12),
                       // CTA
                       GestureDetector(
-                        onTap: () =>
-                            setState(() => _navigating = !_navigating),
+                        onTap: () async {
+                          if (_navigating) {
+                            setState(() => _navigating = false);
+                            return;
+                          }
+                          setState(() {
+                            _isLoading = true;
+                            _apiError = null;
+                          });
+                          
+                          final resp = await ApiService.pivotRoute(
+                            origin: 'Colombo 3',
+                            destination: _destination,
+                            blockedTransportMode: _activeMode == 0 ? 'Train' : 'Bus',
+                          );
+
+                          setState(() {
+                            _isLoading = false;
+                            if (resp.success) {
+                              _navigating = true;
+                            } else {
+                              _apiError = resp.error ?? 'Failed to pivot route';
+                            }
+                          });
+                        },
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 200),
                           width: double.infinity,
@@ -556,20 +588,27 @@ class _RoutesScreenState extends State<RoutesScreen>
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              if (!_navigating) ...[
+                              if (_isLoading)
+                                const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(strokeWidth: 2, color: AyuColors.navy),
+                                )
+                              else if (!_navigating) ...[
                                 const Icon(Icons.navigation_rounded,
                                     size: 17, color: AyuColors.navy),
                                 const SizedBox(width: 10),
                               ],
-                              Text(
-                                _navigating
-                                    ? 'End Navigation'
-                                    : 'Start Navigation',
-                                style: AyuText.button(
-                                    color: _navigating
-                                        ? AyuColors.white
-                                        : AyuColors.navy),
-                              ),
+                              if (!_isLoading)
+                                Text(
+                                  _navigating
+                                      ? 'End Navigation'
+                                      : 'Start Navigation',
+                                  style: AyuText.button(
+                                      color: _navigating
+                                          ? AyuColors.white
+                                          : AyuColors.navy),
+                                ),
                             ],
                           ),
                         ),
