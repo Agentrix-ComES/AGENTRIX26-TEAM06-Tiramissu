@@ -45,5 +45,7 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>The Guardian feature needs your microphone to listen for potential scams in real-time.</string>
 </dict>
 </plist>

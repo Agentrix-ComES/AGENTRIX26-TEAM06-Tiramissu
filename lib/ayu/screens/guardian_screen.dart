@@ -1,8 +1,17 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io' show Platform;
+import 'dart:typed_data';
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
+import 'package:record/record.dart';
+import 'package:web_socket_channel/web_socket_channel.dart';
+
 import '../theme/ayu_colors.dart';
 import '../theme/ayu_text_styles.dart';
 
-/// Guardian screen — camera AR overlay, mic pulse rings, animated scam alert card.
+/// Guardian screen — camera AR overlay, interactive mic, animated scam alert, and live analysis box.
 class GuardianScreen extends StatefulWidget {
   const GuardianScreen({super.key, required this.onBack});
   final VoidCallback onBack;
@@ -14,9 +23,27 @@ class GuardianScreen extends StatefulWidget {
 class _GuardianScreenState extends State<GuardianScreen>
     with TickerProviderStateMixin {
   bool _scamVisible = false;
+  bool _isRecording = false;
+
   late AnimationController _pulse0, _pulse1, _pulse2;
   late AnimationController _scamSlide;
   late Animation<Offset> _scamOffset;
+
+  // Real-time audio and WebSocket
+  final _record = AudioRecorder();
+  WebSocketChannel? _channel;
+  StreamSubscription<Uint8List>? _audioStream;
+
+  String _currentStatus = 'Tap microphone to start listening';
+
+  // Live Analysis History
+  final List<Map<String, String>> _analysisHistory = [];
+  final ScrollController _scrollController = ScrollController();
+
+  // Active Scam Alert data
+  String _threatMessage = '';
+  String _actionSuggested = '';
+  String _transcriptSnippet = '';
 
   @override
   void initState() {
@@ -34,16 +61,144 @@ class _GuardianScreenState extends State<GuardianScreen>
     _scamOffset = Tween<Offset>(
       begin: const Offset(0, 1),
       end: Offset.zero,
-    ).animate(CurvedAnimation(
-        parent: _scamSlide, curve: Curves.easeOutBack));
+    ).animate(CurvedAnimation(parent: _scamSlide, curve: Curves.easeOutBack));
 
-    // Auto-trigger after 3.5 s
-    Future.delayed(const Duration(milliseconds: 3500), () {
-      if (mounted) {
-        setState(() => _scamVisible = true);
-        _scamSlide.forward();
-      }
+    _initWebSocket();
+  }
+
+  Future<void> _initWebSocket() async {
+    final host = Platform.isAndroid ? '10.0.2.2' : '127.0.0.1';
+    final wsUrl = Uri.parse(
+      'ws://$host:8000/api/guardian/stream?context=Tuk-tuk+negotiation+Kandy',
+    );
+
+    _channel = WebSocketChannel.connect(wsUrl);
+
+    _channel!.stream.listen(
+      (message) {
+        final data = jsonDecode(message);
+
+        if (data['type'] == 'READY') {
+          debugPrint('WebSocket ready');
+          return;
+        }
+
+        if (data['type'] == 'ERROR') {
+          setState(() {
+            _currentStatus = data['message'] ?? 'An error occurred';
+          });
+          return;
+        }
+
+        if (data['mode'] == 'guardian') {
+          final status = data['status'];
+          final englishText = data['english_text'] ?? '';
+          final threatMsg = data['threat_message'] ?? '';
+          final actSuggested = data['action_suggested'] ?? '';
+          final originalText = data['original_text'] ?? '';
+
+          if (englishText.isNotEmpty) {
+            setState(() {
+              _currentStatus = 'Analysis complete.';
+              _analysisHistory.insert(0, {
+                'status': status,
+                'original': originalText,
+                'english': englishText,
+                'threat': threatMsg,
+                'action': actSuggested,
+              });
+            });
+            _scrollToTop();
+          }
+
+          if (status == 'SCAM' || status == 'WARNING') {
+            setState(() {
+              _scamVisible = true;
+              _threatMessage = threatMsg.isEmpty
+                  ? 'Suspicious activity detected.'
+                  : threatMsg;
+              _actionSuggested = actSuggested.isEmpty
+                  ? 'Proceed with caution.'
+                  : actSuggested;
+              _transcriptSnippet = data['transcript_snippet'] ?? '';
+            });
+            if (!_scamSlide.isCompleted) {
+              _scamSlide.forward();
+            }
+          }
+        }
+      },
+      onError: (err) {
+        debugPrint('WebSocket error: $err');
+        setState(() => _currentStatus = 'Connection error');
+      },
+      onDone: () {
+        debugPrint('WebSocket closed');
+        setState(() {
+          _isRecording = false;
+          _currentStatus = 'Disconnected';
+        });
+      },
+    );
+  }
+
+  void _scrollToTop() {
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    }
+  }
+
+  Future<void> _toggleRecording() async {
+    if (_isRecording) {
+      await _stopRecording();
+    } else {
+      await _startRecording();
+    }
+  }
+
+  Future<void> _startRecording() async {
+    if (await _record.hasPermission()) {
+      setState(() {
+        _isRecording = true;
+        _currentStatus = 'Listening...';
+        _scamVisible = false; // dismiss old scam alert
+      });
+      _scamSlide.reverse();
+
+      final stream = await _record.startStream(
+        const RecordConfig(
+          encoder: AudioEncoder.pcm16bits,
+          sampleRate: 16000,
+          numChannels: 1,
+        ),
+      );
+
+      _audioStream = stream.listen((data) {
+        if (_channel != null && _isRecording) {
+          final base64Audio = base64Encode(data);
+          _channel!.sink.add('base64:$base64Audio');
+        }
+      });
+    } else {
+      setState(() => _currentStatus = 'Microphone permission denied');
+    }
+  }
+
+  Future<void> _stopRecording() async {
+    setState(() {
+      _isRecording = false;
+      _currentStatus = 'Processing...';
     });
+
+    // Tell backend to immediately process the buffer
+    _channel?.sink.add('FLUSH');
+
+    // Stop grabbing audio
+    await _record.stop();
   }
 
   AnimationController _makePulse(int delayMs) {
@@ -63,6 +218,11 @@ class _GuardianScreenState extends State<GuardianScreen>
     _pulse1.dispose();
     _pulse2.dispose();
     _scamSlide.dispose();
+    _scrollController.dispose();
+
+    _audioStream?.cancel();
+    _record.dispose();
+    _channel?.sink.close();
     super.dispose();
   }
 
@@ -82,7 +242,8 @@ class _GuardianScreenState extends State<GuardianScreen>
           child: Image.network(
             'https://images.unsplash.com/photo-1772729629782-558d884c5d96?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080',
             fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => Container(color: const Color(0xFF1A2A1A)),
+            errorBuilder: (_, __, ___) =>
+                Container(color: const Color(0xFF1A2A1A)),
           ),
         ),
         // Top vignette
@@ -102,16 +263,12 @@ class _GuardianScreenState extends State<GuardianScreen>
           ),
         ),
         // Scan-line overlay (only when no scam alert)
-        if (!_scamVisible)
-          _ScanLinesOverlay(),
+        if (!_scamVisible) _ScanLinesOverlay(),
         // Back button
         Positioned(
           top: 40,
           left: 20,
-          child: _CircleButton(
-            icon: Icons.arrow_back,
-            onTap: widget.onBack,
-          ),
+          child: _CircleButton(icon: Icons.arrow_back, onTap: widget.onBack),
         ),
         // "GUARDIAN ACTIVE" label
         Positioned(
@@ -128,66 +285,77 @@ class _GuardianScreenState extends State<GuardianScreen>
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.shield_rounded,
-                      size: 13, color: AyuColors.lime),
+                  const Icon(
+                    Icons.shield_rounded,
+                    size: 13,
+                    color: AyuColors.lime,
+                  ),
                   const SizedBox(width: 6),
-                  Text('GUARDIAN ACTIVE',
-                      style: AyuText.label(
-                          color: AyuColors.white,
-                          size: 12,
-                          weight: FontWeight.w700,
-                          letterSpacing: 0.04 * 12)),
+                  Text(
+                    'GUARDIAN ACTIVE',
+                    style: AyuText.label(
+                      color: AyuColors.white,
+                      size: 12,
+                      weight: FontWeight.w700,
+                      letterSpacing: 0.04 * 12,
+                    ),
+                  ),
                   const SizedBox(width: 6),
-                  _PulsingDot(),
+                  if (_isRecording) _PulsingDot(),
                 ],
               ),
             ),
           ),
         ),
-        // Top AR info cards
-        Positioned(
-          top: 96,
-          left: 16,
-          right: 16,
-          child: Row(
-            children: [
-              Expanded(child: _ArCard(label: 'DISTANCE', value: '1.2 km', sub: 'Fort Station', icon: Icons.navigation_rounded)),
-              const SizedBox(width: 10),
-              Expanded(child: _ArCard(label: 'LOCATION', value: 'Kandy Market', sub: 'Kandy City', icon: Icons.location_on_rounded)),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _ArCard(
-                  label: 'FAIR FARE',
-                  value: '₨1,200',
-                  sub: 'Tuk avg.',
-                  icon: Icons.shield_rounded,
-                  accent: true,
-                ),
-              ),
-            ],
-          ),
-        ),
-        // Mic pulse rings (only when no scam)
+
+        // Live Analysis Box
         if (!_scamVisible)
           Positioned(
-            bottom: 160,
+            bottom: 240,
+            left: 20,
+            right: 20,
+            height: 200,
+            child: _LiveAnalysisBox(
+              history: _analysisHistory,
+              scrollController: _scrollController,
+            ),
+          ),
+
+        // Interactive Mic Button
+        if (!_scamVisible)
+          Positioned(
+            bottom: 60,
             left: 0,
             right: 0,
             child: Column(
               children: [
-                _MicPulseRings(ctrl0: _pulse0, ctrl1: _pulse1, ctrl2: _pulse2),
+                GestureDetector(
+                  onTap: _toggleRecording,
+                  child: _MicPulseRings(
+                    ctrl0: _pulse0,
+                    ctrl1: _pulse1,
+                    ctrl2: _pulse2,
+                    isRecording: _isRecording,
+                  ),
+                ),
                 const SizedBox(height: 12),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.black.withOpacity(0.4),
                     borderRadius: BorderRadius.circular(50),
                   ),
-                  child: Text('Listening for unusual pricing…',
-                      style: AyuText.label(
-                          color: AyuColors.white,
-                          size: 12,
-                          weight: FontWeight.w600)),
+                  child: Text(
+                    _currentStatus,
+                    style: AyuText.label(
+                      color: AyuColors.white,
+                      size: 13,
+                      weight: FontWeight.w600,
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -201,6 +369,9 @@ class _GuardianScreenState extends State<GuardianScreen>
             child: SlideTransition(
               position: _scamOffset,
               child: _ScamAlertCard(
+                threatMessage: _threatMessage,
+                actionSuggested: _actionSuggested,
+                transcriptSnippet: _transcriptSnippet,
                 onDecline: () {
                   _scamSlide.reverse().then((_) {
                     if (mounted) setState(() => _scamVisible = false);
@@ -218,6 +389,165 @@ class _GuardianScreenState extends State<GuardianScreen>
     );
   }
 }
+
+// ── Live Analysis Box Widget ────────────────────────────────────────────────
+
+class _LiveAnalysisBox extends StatelessWidget {
+  const _LiveAnalysisBox({
+    required this.history,
+    required this.scrollController,
+  });
+
+  final List<Map<String, String>> history;
+  final ScrollController scrollController;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(20),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.black.withOpacity(0.35),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: Colors.white.withOpacity(0.15)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Header
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.2),
+                  border: Border(
+                    bottom: BorderSide(color: Colors.white.withOpacity(0.1)),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.analytics_rounded,
+                      size: 14,
+                      color: AyuColors.sageAccent,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'LIVE ANALYSIS',
+                      style: AyuText.label(
+                        color: AyuColors.sageAccent,
+                        size: 11,
+                        weight: FontWeight.w700,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // List of history
+              Expanded(
+                child: history.isEmpty
+                    ? Center(
+                        child: Text(
+                          "Tap the mic to start analyzing conversations.",
+                          style: AyuText.body(
+                            color: Colors.white.withOpacity(0.5),
+                            size: 13,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      )
+                    : ListView.separated(
+                        controller: scrollController,
+                        padding: const EdgeInsets.all(16),
+                        reverse: true,
+                        itemCount: history.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 16),
+                        itemBuilder: (context, index) {
+                          final item = history[index];
+                          final isSafe = item['status'] == 'SAFE';
+                          final statusColor = isSafe
+                              ? AyuColors.success
+                              : AyuColors.warning;
+
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '"${item['english']}"',
+                                style: AyuText.body(
+                                  color: Colors.white,
+                                  size: 14,
+                                  weight: FontWeight.w600,
+                                ),
+                              ),
+                              if (item['original'] != item['english']) ...[
+                                const SizedBox(height: 4),
+                                Text(
+                                  item['original'] ?? '',
+                                  style: AyuText.body(
+                                    color: Colors.white.withOpacity(0.5),
+                                    size: 12,
+                                  ).copyWith(fontStyle: FontStyle.italic),
+                                ),
+                              ],
+                              const SizedBox(height: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 8,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: statusColor.withOpacity(0.15),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: statusColor.withOpacity(0.3),
+                                  ),
+                                ),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Icon(
+                                      isSafe
+                                          ? Icons.check_circle_rounded
+                                          : Icons.info_outline_rounded,
+                                      size: 14,
+                                      color: statusColor,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        item['action'] ?? '',
+                                        style: AyuText.body(
+                                          color: isSafe
+                                              ? AyuColors.sageLightBg
+                                              : AyuColors.warningLight,
+                                          size: 13,
+                                          weight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Utilities ───────────────────────────────────────────────────────────────
 
 class _CircleButton extends StatelessWidget {
   const _CircleButton({required this.icon, required this.onTap});
@@ -253,18 +583,29 @@ class _PulsingDotState extends State<_PulsingDot>
   void initState() {
     super.initState();
     _c = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 900))
-      ..repeat(reverse: true);
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..repeat(reverse: true);
   }
+
   @override
-  void dispose() { _c.dispose(); super.dispose(); }
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) => FadeTransition(
-        opacity: Tween<double>(begin: 0.3, end: 1.0).animate(_c),
-        child: Container(
-            width: 6, height: 6,
-            decoration: const BoxDecoration(color: AyuColors.lime, shape: BoxShape.circle)),
-      );
+    opacity: Tween<double>(begin: 0.3, end: 1.0).animate(_c),
+    child: Container(
+      width: 6,
+      height: 6,
+      decoration: const BoxDecoration(
+        color: AyuColors.danger,
+        shape: BoxShape.circle,
+      ),
+    ),
+  );
 }
 
 class _ArCard extends StatelessWidget {
@@ -318,11 +659,21 @@ class _ArCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 4),
-            Text(value,
-                style: AyuText.body(
-                    size: 18.4, weight: FontWeight.w800, color: AyuColors.white)),
-            Text(sub,
-                style: AyuText.label(color: Colors.white.withOpacity(0.6), size: 10)),
+            Text(
+              value,
+              style: AyuText.body(
+                size: 18.4,
+                weight: FontWeight.w800,
+                color: AyuColors.white,
+              ),
+            ),
+            Text(
+              sub,
+              style: AyuText.label(
+                color: Colors.white.withOpacity(0.6),
+                size: 10,
+              ),
+            ),
           ],
         ),
       ),
@@ -331,8 +682,15 @@ class _ArCard extends StatelessWidget {
 }
 
 class _MicPulseRings extends StatelessWidget {
-  const _MicPulseRings({required this.ctrl0, required this.ctrl1, required this.ctrl2});
+  const _MicPulseRings({
+    required this.ctrl0,
+    required this.ctrl1,
+    required this.ctrl2,
+    required this.isRecording,
+  });
+
   final AnimationController ctrl0, ctrl1, ctrl2;
+  final bool isRecording;
 
   @override
   Widget build(BuildContext context) {
@@ -342,17 +700,32 @@ class _MicPulseRings extends StatelessWidget {
       child: Stack(
         alignment: Alignment.center,
         children: [
-          _PulseRing(ctrl: ctrl0, maxRadius: 58),
-          _PulseRing(ctrl: ctrl1, maxRadius: 48),
-          _PulseRing(ctrl: ctrl2, maxRadius: 38),
-          Container(
+          if (isRecording) ...[
+            _PulseRing(ctrl: ctrl0, maxRadius: 58),
+            _PulseRing(ctrl: ctrl1, maxRadius: 48),
+            _PulseRing(ctrl: ctrl2, maxRadius: 38),
+          ],
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
             width: 56,
             height: 56,
-            decoration: const BoxDecoration(
-              color: AyuColors.lime,
+            decoration: BoxDecoration(
+              color: isRecording
+                  ? AyuColors.lime
+                  : Colors.white.withOpacity(0.2),
               shape: BoxShape.circle,
+              border: Border.all(
+                color: isRecording
+                    ? Colors.transparent
+                    : Colors.white.withOpacity(0.5),
+                width: 2,
+              ),
             ),
-            child: const Icon(Icons.mic_rounded, size: 22, color: AyuColors.navy),
+            child: Icon(
+              isRecording ? Icons.mic_rounded : Icons.mic_none_rounded,
+              size: 24,
+              color: isRecording ? AyuColors.navy : Colors.white,
+            ),
           ),
         ],
       ),
@@ -417,23 +790,22 @@ class _ScanLinesOverlayState extends State<_ScanLinesOverlay>
   void initState() {
     super.initState();
     _ctrl = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 2500))
-      ..repeat(reverse: true);
+      vsync: this,
+      duration: const Duration(milliseconds: 2500),
+    )..repeat(reverse: true);
   }
+
   @override
-  void dispose() { _ctrl.dispose(); super.dispose(); }
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) => FadeTransition(
-        opacity: Tween<double>(begin: 0, end: 0.06).animate(_ctrl),
-        child: Container(
-          decoration: const BoxDecoration(
-            image: DecorationImage(
-              image: AssetImage(''), // empty — drawn via shader
-            ),
-          ),
-          child: CustomPaint(painter: _ScanLinePainter()),
-        ),
-      );
+    opacity: Tween<double>(begin: 0, end: 0.06).animate(_ctrl),
+    child: Container(child: CustomPaint(painter: _ScanLinePainter())),
+  );
 }
 
 class _ScanLinePainter extends CustomPainter {
@@ -446,14 +818,24 @@ class _ScanLinePainter extends CustomPainter {
       canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
     }
   }
+
   @override
   bool shouldRepaint(_) => false;
 }
 
 class _ScamAlertCard extends StatelessWidget {
-  const _ScamAlertCard({required this.onDecline, required this.onFairPrice});
+  const _ScamAlertCard({
+    required this.onDecline,
+    required this.onFairPrice,
+    required this.threatMessage,
+    required this.actionSuggested,
+    required this.transcriptSnippet,
+  });
   final VoidCallback onDecline;
   final VoidCallback onFairPrice;
+  final String threatMessage;
+  final String actionSuggested;
+  final String transcriptSnippet;
 
   @override
   Widget build(BuildContext context) {
@@ -463,7 +845,10 @@ class _ScamAlertCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white.withOpacity(0.96),
           borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: AyuColors.danger.withOpacity(0.25), width: 1.5),
+          border: Border.all(
+            color: AyuColors.danger.withOpacity(0.25),
+            width: 1.5,
+          ),
           boxShadow: [
             BoxShadow(
               color: AyuColors.danger.withOpacity(0.25),
@@ -479,25 +864,34 @@ class _ScamAlertCard extends StatelessWidget {
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // Alert header strip
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               decoration: BoxDecoration(
                 color: AyuColors.danger.withOpacity(0.1),
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(24),
+                ),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.warning_amber_rounded,
-                      size: 18, color: AyuColors.danger),
+                  const Icon(
+                    Icons.warning_amber_rounded,
+                    size: 18,
+                    color: AyuColors.danger,
+                  ),
                   const SizedBox(width: 10),
-                  Text('SCAM ALERT DETECTED',
-                      style: AyuText.label(
-                          color: AyuColors.danger,
-                          size: 13.6,
-                          weight: FontWeight.w800,
-                          letterSpacing: 0.04 * 14)),
+                  Text(
+                    'SCAM ALERT DETECTED',
+                    style: AyuText.label(
+                      color: AyuColors.danger,
+                      size: 13.6,
+                      weight: FontWeight.w800,
+                      letterSpacing: 0.04 * 14,
+                    ),
+                  ),
                   const Spacer(),
                   GestureDetector(
                     onTap: onDecline,
@@ -508,8 +902,11 @@ class _ScamAlertCard extends StatelessWidget {
                         color: AyuColors.danger.withOpacity(0.15),
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.close,
-                          size: 12, color: AyuColors.danger),
+                      child: const Icon(
+                        Icons.close,
+                        size: 12,
+                        color: AyuColors.danger,
+                      ),
                     ),
                   ),
                 ],
@@ -520,57 +917,54 @@ class _ScamAlertCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('⚠️ Overpriced Fare Detected',
-                      style: AyuText.body(
-                          size: 16.8, weight: FontWeight.w700)),
+                  Text(
+                    '⚠️ Threat Assessment',
+                    style: AyuText.body(size: 16.8, weight: FontWeight.w700),
+                  ),
                   const SizedBox(height: 8),
-                  RichText(
-                    text: TextSpan(
-                      style: AyuText.body(
-                          color: const Color(0xFF64748B), size: 14),
-                      children: [
-                        const TextSpan(text: 'Driver quoted '),
-                        TextSpan(
-                          text: 'LKR 5,000',
-                          style: AyuText.body(
-                              size: 14,
-                              weight: FontWeight.w700,
-                              color: AyuColors.danger),
-                        ),
-                        const TextSpan(
-                            text: ' for this route. The local average for 1.2 km is only '),
-                        TextSpan(
-                          text: 'LKR 1,200',
-                          style: AyuText.body(
-                              size: 14,
-                              weight: FontWeight.w700,
-                              color: AyuColors.success),
-                        ),
-                        const TextSpan(text: '.'),
-                      ],
+
+                  // The actual threat explanation
+                  Text(
+                    threatMessage,
+                    style: AyuText.body(
+                      color: AyuColors.danger,
+                      size: 14,
+                      weight: FontWeight.w500,
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  // Price comparison bar
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF8F9FA),
-                      borderRadius: BorderRadius.circular(16),
+
+                  const SizedBox(height: 12),
+
+                  // Snippet that triggered it
+                  if (transcriptSnippet.isNotEmpty) ...[
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8F9FA),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        '"$transcriptSnippet"',
+                        style: AyuText.body(
+                          color: const Color(0xFF64748B),
+                          size: 13,
+                        ).copyWith(fontStyle: FontStyle.italic),
+                      ),
                     ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
-                      children: [
-                        _PriceCol(label: 'QUOTED', value: '₨5,000', color: AyuColors.danger),
-                        Container(width: 1, height: 32, color: AyuColors.divider),
-                        _PriceCol(label: 'FAIR PRICE', value: '₨1,200', color: AyuColors.success),
-                        Container(width: 1, height: 32, color: AyuColors.divider),
-                        _PriceCol(label: 'OVERCHARGE', value: '4.2×', color: AyuColors.danger),
-                      ],
+                    const SizedBox(height: 12),
+                  ],
+
+                  // Action suggested
+                  Text(
+                    'Action: $actionSuggested',
+                    style: AyuText.body(
+                      color: AyuColors.navy,
+                      size: 14,
+                      weight: FontWeight.w700,
                     ),
                   ),
-                  const SizedBox(height: 16),
+
+                  const SizedBox(height: 20),
                   // Action buttons
                   Row(
                     children: [
@@ -586,12 +980,14 @@ class _ScamAlertCard extends StatelessWidget {
                       const SizedBox(width: 12),
                       Expanded(
                         child: _ActionButton(
-                          label: 'Fair Price',
+                          label: 'Dismiss',
                           icon: Icons.check_circle_outline_rounded,
                           color: AyuColors.success,
                           bgColor: Colors.transparent,
                           border: Border.all(
-                              color: AyuColors.success, width: 2),
+                            color: AyuColors.success,
+                            width: 2,
+                          ),
                           onTap: onFairPrice,
                         ),
                       ),
@@ -603,26 +999,6 @@ class _ScamAlertCard extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-class _PriceCol extends StatelessWidget {
-  const _PriceCol({required this.label, required this.value, required this.color});
-  final String label, value;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Text(label,
-            style: AyuText.label(
-                color: AyuColors.textSubtle, size: 11.2, weight: FontWeight.w600)),
-        const SizedBox(height: 2),
-        Text(value,
-            style: AyuText.body(size: 19.2, weight: FontWeight.w800, color: color)),
-      ],
     );
   }
 }
@@ -652,36 +1028,55 @@ class _ActionButtonState extends State<_ActionButton>
   @override
   void initState() {
     super.initState();
-    _p = AnimationController(vsync: this, lowerBound: 0.96, upperBound: 1.0, value: 1.0, duration: const Duration(milliseconds: 100));
+    _p = AnimationController(
+      vsync: this,
+      lowerBound: 0.96,
+      upperBound: 1.0,
+      value: 1.0,
+      duration: const Duration(milliseconds: 100),
+    );
   }
+
   @override
-  void dispose() { _p.dispose(); super.dispose(); }
+  void dispose() {
+    _p.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) => GestureDetector(
-        onTapDown: (_) => _p.reverse(),
-        onTapUp: (_) { _p.forward(); widget.onTap(); },
-        onTapCancel: () => _p.forward(),
-        child: AnimatedBuilder(
-          animation: _p,
-          builder: (_, child) => Transform.scale(scale: _p.value, child: child),
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 14),
-            decoration: BoxDecoration(
-              color: widget.bgColor,
-              borderRadius: BorderRadius.circular(50),
-              border: widget.border,
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(widget.icon, size: 15, color: widget.color),
-                const SizedBox(width: 8),
-                Text(widget.label,
-                    style: AyuText.body(
-                        size: 14.4, weight: FontWeight.w700, color: widget.color)),
-              ],
-            ),
-          ),
+    onTapDown: (_) => _p.reverse(),
+    onTapUp: (_) {
+      _p.forward();
+      widget.onTap();
+    },
+    onTapCancel: () => _p.forward(),
+    child: AnimatedBuilder(
+      animation: _p,
+      builder: (_, child) => Transform.scale(scale: _p.value, child: child),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        decoration: BoxDecoration(
+          color: widget.bgColor,
+          borderRadius: BorderRadius.circular(50),
+          border: widget.border,
         ),
-      );
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(widget.icon, size: 15, color: widget.color),
+            const SizedBox(width: 8),
+            Text(
+              widget.label,
+              style: AyuText.body(
+                size: 14.4,
+                weight: FontWeight.w700,
+                color: widget.color,
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }
