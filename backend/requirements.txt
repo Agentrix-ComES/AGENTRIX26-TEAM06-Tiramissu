@@ -1,0 +1,13 @@
+langchain
+langchain-google-genai
+langchain-core
+httpx
+pydantic
+python-dotenv
+faiss-cpu
+langchain-community
+langchain-huggingface
+sentence-transformers
+tiktoken
+langchain-text-splitters
+supabase

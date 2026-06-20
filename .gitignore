@@ -1,3 +1,4 @@
+
 # Miscellaneous
 *.class
 *.log
@@ -43,3 +44,10 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Backend Python
+.env
+__pycache__/
+*.pyc
+.venv/
+venv/
