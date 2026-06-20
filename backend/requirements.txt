@@ -10,3 +10,4 @@ langchain-huggingface
 sentence-transformers
 tiktoken
 langchain-text-splitters
+supabase

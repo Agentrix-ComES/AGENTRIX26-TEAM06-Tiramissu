@@ -88,6 +88,8 @@ async def vision_analyze(
 # ── Route Pivot endpoints ────────────────────────────────────────────────
 
 
+from .cache import get_cached_route, set_cached_route
+
 @router.post("/route/pivot", response_model=RouteResponse)
 async def route_pivot_structured(body: RouteDisruptionRequest):
     """Handle a structured transit disruption report.
@@ -96,12 +98,26 @@ async def route_pivot_structured(body: RouteDisruptionRequest):
     The agent computes a fallback route and returns negotiation scripts.
     """
     try:
+        # Check cache first
+        cached_result = get_cached_route(body.origin, body.destination, body.blocked_transport_mode)
+        if cached_result:
+            return RouteResponse(
+                success=True,
+                output=cached_result["output"],
+                steps=cached_result.get("intermediate_steps"),
+            )
+
+        # Cache miss, run the agent
         ctx = RoutePivotContext(
             origin=body.origin,
             destination=body.destination,
             blocked_transport_mode=body.blocked_transport_mode,
         )
         result = await handle_route_pivot(ctx)
+        
+        # Save to cache asynchronously or synchronously (we just do sync in the helper)
+        set_cached_route(body.origin, body.destination, body.blocked_transport_mode, result)
+
         return RouteResponse(
             success=True,
             output=result["output"],
