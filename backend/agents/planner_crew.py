@@ -18,7 +18,7 @@ from langchain_core.messages import SystemMessage, HumanMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
 
 from .schemas import SmartItineraryRequest, SmartItineraryResponse, ItineraryStop
-from .tools import calculate_osrm_fallback, search_cultural_knowledge
+from .tools import calculate_osrm_fallback, search_cultural_knowledge, search_tourist_pois
 
 load_dotenv()
 
@@ -48,12 +48,18 @@ Available well-known coordinates:
 - Anuradhapura: 80.4036,8.3114 | Dambulla: 80.6518,7.8742
 
 INSTRUCTIONS:
-1. Review the user's constraints: Budget (LKR), Time (Hours), Interests.
-2. Select 2 to 4 locations that fit the criteria.
-3. Return the structured itinerary. 
-4. DO NOT worry about the exact travel duration or geometry; the backend will calculate the exact driving routes and add them. Just provide a reasonable sequence of stops.
-5. The total cost should not exceed the user's budget.
-6. If there are disruptions reported, route AROUND them.
+1. Review the user's constraints: Budget (LKR), Time (Hours), Interests, Origin location.
+2. Use the `search_tourist_pois` tool to find real tourist spots matching the user's interests near their origin or along their route.
+   - Pass the user's origin coordinates as lat/lon
+   - Use a radius of 5000-10000 meters
+   - Pass the user's interests, budget, and time_available
+   - Optionally pass start_lat/start_lon for distance calculation from user's starting point
+3. Select 2 to 4 POIs from the search results that fit the criteria.
+4. Return the structured itinerary with these POIs as stops.
+5. DO NOT worry about the exact travel duration or geometry; the backend will calculate the exact driving routes and add them. Just provide a reasonable sequence of stops.
+6. The total cost should not exceed the user's budget.
+7. If there are disruptions reported, route AROUND them.
+8. If search_tourist_pois returns no results, use your knowledge of popular Sri Lankan attractions.
 """
 
 async def plan_smart_itinerary(request: SmartItineraryRequest) -> SmartItineraryResponse:
