@@ -106,3 +106,32 @@ class PivotResponse(BaseModel):
         ...,
         description="Cultural tips for navigating the informal transport economy.",
     )
+
+
+class SmartItineraryRequest(BaseModel):
+    """Input for the smart trip planner agent."""
+    origin_lat: float = Field(..., description="Latitude of the user's origin.")
+    origin_lon: float = Field(..., description="Longitude of the user's origin.")
+    budget_lkr: int = Field(..., description="Budget available in Sri Lankan Rupees.")
+    time_hours: int = Field(..., description="Time available in hours.")
+    interests: str = Field(..., description="User interests for the trip.")
+    disruptions: str = Field(default="", description="Any reported disruptions or news.")
+
+
+class ItineraryStop(BaseModel):
+    """A single stop on the planned itinerary."""
+    name: str = Field(..., description="Name of the attraction or location.")
+    lat: float = Field(..., description="Latitude of the location.")
+    lon: float = Field(..., description="Longitude of the location.")
+    cost_lkr: int = Field(..., description="Estimated cost in LKR.")
+    duration_mins: int = Field(..., description="Estimated time spent here in minutes.")
+    description: str = Field(..., description="Brief description of why this fits the user's interests.")
+
+
+class SmartItineraryResponse(BaseModel):
+    """The complete itinerary plan output by the LLM."""
+    total_cost_lkr: int = Field(..., description="Total estimated cost of the itinerary.")
+    total_duration_mins: int = Field(..., description="Total estimated duration including travel.")
+    stops: list[ItineraryStop] = Field(..., description="List of stops in order.")
+    geometry: dict | None = Field(default=None, description="GeoJSON FeatureCollection or LineString of the complete route.")
+    transport_recommendation: str = Field(..., description="Advice on how to travel between these stops.")

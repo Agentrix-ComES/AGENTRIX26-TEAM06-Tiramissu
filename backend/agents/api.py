@@ -18,7 +18,14 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 
 from .route_crew import handle_route_pivot, handle_route_pivot_from_text
-from .schemas import PivotResponse, RoutePivotContext, VisionAnalysis
+from .planner_crew import plan_smart_itinerary
+from .schemas import (
+    PivotResponse,
+    RoutePivotContext,
+    VisionAnalysis,
+    SmartItineraryRequest,
+    SmartItineraryResponse,
+)
 from .vision_agent import analyze_monument
 
 logger = logging.getLogger(__name__)
@@ -53,6 +60,13 @@ class RouteResponse(BaseModel):
     success: bool
     output: str | None = None
     steps: list[dict] | None = None
+    error: str | None = None
+
+
+class SmartItineraryAPIResponse(BaseModel):
+    """Wraps SmartItineraryResponse with an API-level success flag."""
+    success: bool
+    data: SmartItineraryResponse | None = None
     error: str | None = None
 
 
@@ -129,6 +143,25 @@ async def route_pivot_structured(body: RouteDisruptionRequest):
         return RouteResponse(success=False, error=str(exc))
     except Exception as exc:
         logger.exception("Unexpected error in route pivot endpoint")
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.post("/route/plan", response_model=SmartItineraryAPIResponse)
+async def route_plan(body: SmartItineraryRequest):
+    """Handle a smart trip planning request.
+
+    Takes user constraints (budget, time, interests, location) and
+    returns a complete multi-stop itinerary with exact OSRM geometry.
+    """
+    try:
+        result = await plan_smart_itinerary(body)
+        return SmartItineraryAPIResponse(success=True, data=result)
+
+    except RuntimeError as exc:
+        logger.exception("Smart trip planner failed")
+        return SmartItineraryAPIResponse(success=False, error=str(exc))
+    except Exception as exc:
+        logger.exception("Unexpected error in smart trip planner")
         raise HTTPException(status_code=500, detail=str(exc))
 
 
