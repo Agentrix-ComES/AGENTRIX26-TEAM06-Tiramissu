@@ -139,7 +139,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     });
   }
 
-  static final _navItems = [
+    static final _navItems = [
     const AyuNavItem(icon: Icons.explore_rounded, label: 'Explore', target: 'explore'),
     const AyuNavItem(icon: Icons.map_rounded, label: 'Routes', target: 'routes'),
     const AyuNavItem(icon: Icons.camera_alt_rounded, label: 'Scanner', target: 'sightglass'),

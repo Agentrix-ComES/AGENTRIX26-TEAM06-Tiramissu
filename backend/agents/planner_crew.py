@@ -102,10 +102,26 @@ async def plan_smart_itinerary(request: SmartItineraryRequest) -> SmartItinerary
         )
     except Exception as exc:
         logger.exception("LLM Planner failed or timed out, using failsafe fallback")
-        plan = SmartItineraryResponse(
-            total_cost_lkr=2000,
-            total_duration_mins=0,
-            stops=[
+        fallback_stops = []
+        try:
+            import json
+            pois_list = json.loads(pois_json)
+            for p in pois_list[:3]:
+                fallback_stops.append(
+                    ItineraryStop(
+                        name=p.get("name", "Unknown POI"),
+                        lat=p.get("lat", request.origin_lat),
+                        lon=p.get("lon", request.origin_lon),
+                        cost_lkr=p.get("estimated_cost_lkr", 0),
+                        duration_mins=p.get("estimated_duration_mins", 60),
+                        description=f"Failsafe fallback: A {p.get('type', 'tourist spot')} nearby."
+                    )
+                )
+        except Exception as e:
+            logger.warning(f"Failed to parse POIs for fallback: {e}")
+            
+        if not fallback_stops:
+            fallback_stops = [
                 ItineraryStop(
                     name="Temple of the Tooth (Kandy)", 
                     lat=7.2936, lon=80.6413, 
@@ -118,8 +134,13 @@ async def plan_smart_itinerary(request: SmartItineraryRequest) -> SmartItinerary
                     cost_lkr=0, duration_mins=60, 
                     description="Failsafe route: Relaxing end to the trip in the capital."
                 )
-            ],
-            transport_recommendation="Failsafe mode active (AI Unavailable or Timeout). Displaying popular fallback route computed purely by OSRM."
+            ]
+
+        plan = SmartItineraryResponse(
+            total_cost_lkr=sum(s.cost_lkr for s in fallback_stops),
+            total_duration_mins=sum(s.duration_mins for s in fallback_stops),
+            stops=fallback_stops,
+            transport_recommendation="Failsafe mode active (AI Unavailable or Timeout). Displaying fallback route computed purely by OSRM."
         )
 
     # 3. Calculate actual routes using OSRM
