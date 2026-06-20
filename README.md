@@ -1,13 +1,13 @@
-# AYU: Resilient Tourism & Cultural Navigator 🇱🇰
+# Travel Bokka: Resilient Tourism & Cultural Navigator 🇱🇰
 
-AYU is a travel-companion application designed to help independent travelers navigate the volatile local transit systems and cultural nuances of Sri Lanka. When trains are delayed, landslides block roads, or cultural barriers arise, AYU steps in as a resilient, offline-capable fallback to prevent itinerary collapse.
+Travel Bokka is a travel-companion application designed to help independent travelers navigate the volatile local transit systems and cultural nuances of Sri Lanka. When trains are delayed, landslides block roads, or cultural barriers arise, Travel Bokka steps in as a resilient, offline-capable fallback to prevent itinerary collapse.
 
 Built for **AGENTRIX 2026** by Team 06 (Tiramissu).
 
 ## Features
 
-- **Route Pivot Agent:** When transport fails (e.g., train cancellation), AYU instantly calculates alternative routes using public APIs (OSRM) and generates localized negotiation scripts (e.g., how to hire a tuk-tuk).
-- **Vision Agent:** Point your camera at a monument, and AYU uses advanced multimodal AI to analyze the site and provide cultural context.
+- **Route Pivot Agent:** When transport fails (e.g., train cancellation), Travel Bokka instantly calculates alternative routes using public APIs (OSRM) and generates localized negotiation scripts (e.g., how to hire a tuk-tuk).
+- **Vision Agent:** Point your camera at a monument, and Travel Bokka uses advanced multimodal AI to analyze the site and provide cultural context.
 - **Cultural Knowledge Base:** RAG-powered retrieval of local customs, scam warnings, and phonetic Sinhala phrases.
 - **High Resilience:** Caches AI responses in Supabase to eliminate redundant API calls and save bandwidth/latency on mass disruption events.
 
