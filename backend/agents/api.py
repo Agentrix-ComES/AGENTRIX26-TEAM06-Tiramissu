@@ -17,8 +17,8 @@ from typing import Optional
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 
-from .route_crew import handle_route_pivot, handle_route_pivot_from_text
-from .schemas import PivotResponse, RoutePivotContext, VisionAnalysis
+from .route_crew import handle_route_pivot, handle_route_pivot_from_text, handle_intelligent_route_planning
+from .schemas import PivotResponse, RoutePivotContext, VisionAnalysis, RoutePlanData
 from .vision_agent import analyze_monument
 
 logger = logging.getLogger(__name__)
@@ -174,49 +174,44 @@ async def route_pivot_freetext(body: FreeTextDisruptionRequest):
 # ── Intelligent Route Planning endpoint ───────────────────────────────────
 
 
-@router.post("/route/plan", response_model=RouteResponse)
+@router.post("/route/plan", response_model=RoutePlanData)
 async def route_plan_intelligent(body: RoutePlanningRequest):
     """Plan an intelligent route based on user preferences.
 
     The frontend sends origin, destination, interests, budget, time available,
     and optional disruptions. The agent computes an optimal route with
     recommendations for POIs, transport mode, and handles dynamic recalibration.
+    
+    Returns a structured RoutePlanData response compatible with the Flutter frontend.
     """
     try:
-        # Build a comprehensive prompt for the LLM
-        interests_str = ", ".join(body.interests) if body.interests else "general sightseeing"
-        
-        user_input = (
-            f"Plan an optimal route from {body.origin} to {body.destination}.\\n"
-            f"- Interests: {interests_str}\\n"
-            f"- Budget: Rs {body.budget}\\n"
-            f"- Time available: {body.time_available_minutes} minutes\\n"
-            f"- Preferred transport: {body.preferred_transport_mode}\\n"
+        # Call the intelligent route planning handler
+        result = await handle_intelligent_route_planning(
+            origin=body.origin,
+            destination=body.destination,
+            interests=body.interests,
+            budget=body.budget,
+            time_available_minutes=body.time_available_minutes,
+            disruptions=body.disruptions,
+            preferred_transport_mode=body.preferred_transport_mode,
         )
         
-        if body.disruptions:
-            user_input += f"- Current disruptions/news: {body.disruptions}\\n"
-        
-        user_input += (
-            "Provide a detailed route plan including:\\n"
-            "1. Recommended transport mode(s)\\n"
-            "2. Turn-by-turn directions with distances\\n"
-            "3. Points of interest along the route matching the user's interests\\n"
-            "4. Estimated costs breakdown\\n"
-            "5. Cultural tips and negotiation scripts if needed\\n"
-            "6. Alternative options if disruptions affect the primary route"
-        )
-
-        result = await handle_route_pivot_from_text(user_input)
-        return RouteResponse(
-            success=True,
-            output=result["output"],
-            steps=result.get("intermediate_steps"),
-        )
+        # Convert to RoutePlanData schema
+        return RoutePlanData(**result)
 
     except RuntimeError as exc:
         logger.exception("Route planning endpoint failed")
-        return RouteResponse(success=False, error=str(exc))
+        return RoutePlanData(
+            success=False,
+            error=str(exc),
+            total_distance_km=0,
+            total_duration_minutes=0,
+            estimated_cost=0,
+            transport_mode="unknown",
+            steps=[],
+            recommendations=[],
+            polyline=[],
+        )
     except Exception as exc:
         logger.exception("Unexpected error in route planning endpoint")
         raise HTTPException(status_code=500, detail=str(exc))

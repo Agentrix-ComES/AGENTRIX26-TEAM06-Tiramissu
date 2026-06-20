@@ -27,19 +27,22 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 _GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
-if not _GEMINI_API_KEY:
-    logger.warning(
-        "GEMINI_API_KEY is not set — vision agent calls will fail at runtime."
+def _get_vision_llm():
+    """Lazy initialization of vision LLM to avoid import-time errors."""
+    if not _GEMINI_API_KEY:
+        logger.warning(
+            "GEMINI_API_KEY is not set — vision agent calls will fail at runtime."
+        )
+    llm = ChatGoogleGenerativeAI(
+        model="gemini-2.0-flash",
+        google_api_key=_GEMINI_API_KEY,
+        temperature=0.2,
+        max_output_tokens=1024,
     )
+    return llm.with_structured_output(VisionAnalysis)
 
-_llm = ChatGoogleGenerativeAI(
-    model="gemini-2.0-flash",
-    google_api_key=_GEMINI_API_KEY,
-    temperature=0.2,
-    max_output_tokens=1024,
-)
-
-_structured_llm = _llm.with_structured_output(VisionAnalysis)
+# Lazy init - only create LLM when actually needed
+_structured_llm = None  # Will be initialized on first use
 
 # ---------------------------------------------------------------------------
 # System prompt
@@ -113,6 +116,11 @@ async def analyze_monument(
     ]
 
     try:
+        # Lazy initialization of vision LLM
+        global _structured_llm
+        if _structured_llm is None:
+            _structured_llm = _get_vision_llm()
+        
         result: VisionAnalysis = await _structured_llm.ainvoke(messages)
         logger.info("Vision analysis complete: site=%s", result.site_name)
         return result

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:geolocator/geolocator.dart';
 import '../theme/ayu_colors.dart';
 import '../theme/ayu_text_styles.dart';
 import '../services/api_service.dart';

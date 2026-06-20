@@ -1,51 +1,76 @@
 ```
-# Dependencies
-.dart_tool/
-.build/
-dependencies/
-
-# Logs and temp files
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+.ENV
+.ENV.*
+requirements.txt.bak
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
 *.log
-*.tmp
+*.pot
+*.po
+*~
+.pytest_cache/
+.mypy_cache/
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# IDE
+.vscode/
+.idea/
 *.swp
+*.swo
 
 # Environment
 .env
 .env.local
 *.env.*
 
-# Editors
-.vscode/
-.idea/
-*.iml
-*.ipr
-*.iws
-
-# OS generated files
+# OS
 .DS_Store
 Thumbs.db
 
-# Build artifacts
-build/
-dist/
-target/
-
-# Python related (if any Python in project)
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-.Python
-venv/
-.venv/
-pip-log.txt
-pip-delete-this-directory.txt
-
-# Coverage reports
-coverage/
-htmlcov/
-.coverage
-
-# Local configuration
-local.properties
+# Dart/Flutter (from lib/ayu/screens/)
+**/pubspec.lock
+**/.dart_tool/
+**/build/
+**/*.g.dart
+**/*.freezed.dart
+**/flutter_export_environment.sh
+**/.packages
+**/.metadata
+.dart_tool/
+.packages
+.flutter-plugins
+.flutter-plugins-dependencies
 ```

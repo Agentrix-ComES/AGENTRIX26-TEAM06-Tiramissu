@@ -106,3 +106,41 @@ class PivotResponse(BaseModel):
         ...,
         description="Cultural tips for navigating the informal transport economy.",
     )
+
+
+class NavigationStepData(BaseModel):
+    """A single turn-by-turn navigation step."""
+
+    instruction: str = Field(..., description="Turn-by-turn instruction")
+    distance: float = Field(..., description="Distance in meters")
+    duration: float = Field(..., description="Duration in seconds")
+    maneuver_type: str = Field(default="straight", description="Type of maneuver")
+    location: list[float] | None = Field(default=None, description="[lon, lat] coordinate")
+
+
+class RouteRecommendationData(BaseModel):
+    """A recommended point of interest along the route."""
+
+    name: str = Field(..., description="Name of the POI")
+    type: str = Field(..., description="Type of POI (temple, restaurant, etc.)")
+    description: str = Field(..., description="Description of the POI")
+    distance_from_route: float = Field(default=0.0, description="Distance from route in km")
+    estimated_duration_minutes: int = Field(default=0, description="Visit duration in minutes")
+    cost: float = Field(default=0.0, description="Entry/visit cost in Rs")
+    rating: float = Field(default=0.0, description="Rating out of 5")
+    image_url: str | None = Field(default=None, description="Optional image URL")
+
+
+class RoutePlanData(BaseModel):
+    """Complete structured route plan response for the intelligent planning endpoint."""
+
+    success: bool = Field(default=True, description="Whether the planning was successful")
+    summary: str | None = Field(default=None, description="Brief summary of the route")
+    total_distance_km: float = Field(default=0.0, description="Total route distance in km")
+    total_duration_minutes: float = Field(default=0.0, description="Total duration in minutes")
+    estimated_cost: float = Field(default=0.0, description="Estimated total cost in Rs")
+    transport_mode: str = Field(default="unknown", description="Recommended transport mode")
+    steps: list[NavigationStepData] = Field(default_factory=list, description="Turn-by-turn steps")
+    recommendations: list[RouteRecommendationData] = Field(default_factory=list, description="POI recommendations")
+    polyline: list[list[float]] = Field(default_factory=list, description="Route polyline as [[lon, lat], ...]")
+    error: str | None = Field(default=None, description="Error message if failed")
