@@ -22,7 +22,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.prebuilt import create_react_agent
 
 from .schemas import RoutePivotContext
-from .tools import calculate_osrm_fallback, search_cultural_knowledge
+from .tools import calculate_osrm_fallback, search_cultural_knowledge, search_tourist_pois
 
 load_dotenv()
 
@@ -48,7 +48,7 @@ _llm = ChatGoogleGenerativeAI(
 # ---------------------------------------------------------------------------
 # Tools
 # ---------------------------------------------------------------------------
-_tools = [calculate_osrm_fallback, search_cultural_knowledge]
+_tools = [calculate_osrm_fallback, search_cultural_knowledge, search_tourist_pois]
 
 # ---------------------------------------------------------------------------
 # System prompt
@@ -68,14 +68,17 @@ A traveler has reported a transit disruption. Your mission is to:
        Trincomalee: 81.2152,8.5874 | Jaffna: 80.0255,9.6615
        Anuradhapura: 80.4036,8.3114 | Dambulla: 80.6518,7.8742
        Mirissa: 80.4582,5.9483 | Arugam Bay: 81.8363,6.8406
-2. Use the `search_cultural_knowledge` tool to get local transport
+2. Use the `search_tourist_pois` tool to find alternative tourist spots 
+   along the new route or near the destination that match the user's interests, budget, and available time.
+3. Use the `search_cultural_knowledge` tool to get local transport
    negotiation tips relevant to the situation.
-3. Produce a final answer that includes:
-   a. A clear summary of the recovery plan.
+4. Produce a final answer that includes:
+   a. A clear summary of the recovery plan and why the alternative route was chosen.
    b. Distance and estimated travel time of the fallback route.
-   c. A phonetic Sinhala negotiation script the traveler can
+   c. A list of 1-3 tourist POIs (from `search_tourist_pois`) they can visit along the way.
+   d. A phonetic Sinhala negotiation script the traveler can
       read aloud to hire local transport (tuk-tuk, van, etc.).
-   d. Cultural tips for navigating the informal transport economy.
+   e. Cultural tips for navigating the informal transport economy.
 """
 
 # ---------------------------------------------------------------------------
