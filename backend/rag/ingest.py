@@ -39,7 +39,7 @@ def build_vector_store() -> None:
     # ── Lazy imports (only needed at ingest time, not at serve time) ──────────
     try:
         from langchain_community.document_loaders import DirectoryLoader, TextLoader
-        from langchain.text_splitter import RecursiveCharacterTextSplitter
+        from langchain_text_splitters import RecursiveCharacterTextSplitter
         from langchain_huggingface import HuggingFaceEmbeddings
         from langchain_community.vectorstores import FAISS
     except ImportError as exc:
