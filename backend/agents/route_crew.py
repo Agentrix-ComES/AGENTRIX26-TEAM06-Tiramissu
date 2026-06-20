@@ -8,7 +8,7 @@ road closure), this agent:
   3. Queries the cultural knowledge base for local negotiation tips.
   4. Synthesises a final recovery plan with a phonetic Sinhala script.
 
-Uses a LangChain ReAct agent backed by Gemini 1.5 Flash.
+Uses a LangGraph ReAct agent backed by Gemini 2.0 Flash.
 """
 
 from __future__ import annotations
@@ -17,9 +17,9 @@ import logging
 import os
 
 from dotenv import load_dotenv
-from langchain.agents import AgentExecutor, create_react_agent
-from langchain_core.prompts import PromptTemplate
+from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langgraph.prebuilt import create_react_agent
 
 from .schemas import RoutePivotContext
 from .tools import calculate_osrm_fallback, search_cultural_knowledge
@@ -39,7 +39,7 @@ if not _GEMINI_API_KEY:
     )
 
 _llm = ChatGoogleGenerativeAI(
-    model="gemini-1.5-flash",
+    model="gemini-2.0-flash",
     google_api_key=_GEMINI_API_KEY,
     temperature=0.3,
     max_output_tokens=2048,
@@ -51,10 +51,9 @@ _llm = ChatGoogleGenerativeAI(
 _tools = [calculate_osrm_fallback, search_cultural_knowledge]
 
 # ---------------------------------------------------------------------------
-# ReAct prompt
+# System prompt
 # ---------------------------------------------------------------------------
-REACT_PROMPT = PromptTemplate.from_template(
-    """\
+SYSTEM_PROMPT = """\
 You are the **Transit Recovery Expert** for a Sri Lanka tourism app.
 
 A traveler has reported a transit disruption. Your mission is to:
@@ -77,41 +76,49 @@ A traveler has reported a transit disruption. Your mission is to:
    c. A phonetic Sinhala negotiation script the traveler can
       read aloud to hire local transport (tuk-tuk, van, etc.).
    d. Cultural tips for navigating the informal transport economy.
-
-You have access to the following tools:
-
-{tools}
-
-Use the following format:
-
-Question: the input question you must answer
-Thought: you should always think about what to do
-Action: the action to take, should be one of [{tool_names}]
-Action Input: the input to the action
-Observation: the result of the action
-... (this Thought/Action/Action Input/Observation can repeat N times)
-Thought: I now know the final answer
-Final Answer: the final answer to the original input question
-
-Begin!
-
-Question: {input}
-Thought:{agent_scratchpad}"""
-)
+"""
 
 # ---------------------------------------------------------------------------
-# Agent executor
+# LangGraph ReAct agent
 # ---------------------------------------------------------------------------
-_agent = create_react_agent(llm=_llm, tools=_tools, prompt=REACT_PROMPT)
-
-_executor = AgentExecutor(
-    agent=_agent,
+_agent = create_react_agent(
+    model=_llm,
     tools=_tools,
-    verbose=True,
-    max_iterations=6,
-    handle_parsing_errors=True,
-    return_intermediate_steps=True,
+    prompt=SYSTEM_PROMPT,
 )
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+def _extract_final_output(result: dict) -> dict:
+    """Parse LangGraph agent result into a clean response dict."""
+    messages = result.get("messages", [])
+
+    # Final answer is the last AI message
+    final_output = ""
+    if messages:
+        final_output = messages[-1].content if hasattr(messages[-1], "content") else str(messages[-1])
+
+    # Extract intermediate tool-call steps
+    steps = []
+    for msg in messages:
+        if hasattr(msg, "tool_calls") and msg.tool_calls:
+            for tc in msg.tool_calls:
+                steps.append({
+                    "tool": tc.get("name", "unknown"),
+                    "tool_input": tc.get("args", {}),
+                })
+        if hasattr(msg, "name") and msg.name:  # ToolMessage
+            steps.append({
+                "tool": msg.name,
+                "observation": msg.content[:500] if hasattr(msg, "content") else "",
+            })
+
+    return {
+        "output": final_output,
+        "intermediate_steps": steps,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -145,22 +152,15 @@ async def handle_route_pivot(context: RoutePivotContext) -> dict:
     )
 
     try:
-        result = await _executor.ainvoke({"input": user_input})
+        result = await _agent.ainvoke(
+            {"messages": [HumanMessage(content=user_input)]}
+        )
+        parsed = _extract_final_output(result)
         logger.info(
             "Route pivot complete: %d intermediate steps",
-            len(result.get("intermediate_steps", [])),
+            len(parsed["intermediate_steps"]),
         )
-        return {
-            "output": result.get("output", ""),
-            "intermediate_steps": [
-                {
-                    "tool": step[0].tool,
-                    "tool_input": step[0].tool_input,
-                    "observation": str(step[1]),
-                }
-                for step in result.get("intermediate_steps", [])
-            ],
-        }
+        return parsed
 
     except Exception as exc:
         logger.exception("Route pivot agent failed")
@@ -189,19 +189,12 @@ async def handle_route_pivot_from_text(disruption_text: str) -> dict:
         Same shape as handle_route_pivot output.
     """
     try:
-        result = await _executor.ainvoke({"input": disruption_text})
+        result = await _agent.ainvoke(
+            {"messages": [HumanMessage(content=disruption_text)]}
+        )
+        parsed = _extract_final_output(result)
         logger.info("Route pivot (free-text) complete")
-        return {
-            "output": result.get("output", ""),
-            "intermediate_steps": [
-                {
-                    "tool": step[0].tool,
-                    "tool_input": step[0].tool_input,
-                    "observation": str(step[1]),
-                }
-                for step in result.get("intermediate_steps", [])
-            ],
-        }
+        return parsed
 
     except Exception as exc:
         logger.exception("Route pivot agent (free-text) failed")
