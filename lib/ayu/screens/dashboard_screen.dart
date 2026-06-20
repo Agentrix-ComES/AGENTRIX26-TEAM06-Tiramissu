@@ -348,7 +348,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     distance: p.dist,
                     rating: p.rating,
                     tag: p.tag,
-                    onTap: () => widget.onNavigate('routes'),
+                    onTap: () => widget.onNavigate('smartRoutes'),
                   ),
                 ))
             .toList(),
@@ -360,7 +360,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final stats = [
       _StatData(label: 'Scams blocked', value: '3', color: AyuColors.danger, bg: AyuColors.dangerBg, action: 'alerts'),
       _StatData(label: 'Money saved', value: '₨11.8K', color: AyuColors.success, bg: AyuColors.successBg, action: 'alerts'),
-      _StatData(label: 'Routes done', value: '7', color: AyuColors.info, bg: AyuColors.infoBg, action: 'routes'),
+      _StatData(label: 'Smart routes', value: '7', color: AyuColors.info, bg: AyuColors.infoBg, action: 'smartRoutes'),
     ];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

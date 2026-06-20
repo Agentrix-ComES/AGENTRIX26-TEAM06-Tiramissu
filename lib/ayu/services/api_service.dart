@@ -38,6 +38,61 @@ class ApiService {
     }
   }
 
+  /// Plan an intelligent route based on user preferences (interests, budget, time).
+  static Future<RoutePlanResponse> planRoute({
+    required String origin,
+    required String destination,
+    required List<String> interests,
+    required double budget,
+    required int timeAvailableMinutes,
+    String? disruptions,
+    String preferredTransportMode = 'any',
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$_baseUrl/route/plan'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'origin': origin,
+          'destination': destination,
+          'interests': interests,
+          'budget': budget,
+          'time_available_minutes': timeAvailableMinutes,
+          'disruptions': disruptions,
+          'preferred_transport_mode': preferredTransportMode,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        return RoutePlanResponse.fromJson(jsonDecode(response.body));
+      } else {
+        return RoutePlanResponse(
+          success: false,
+          totalDistanceKm: 0,
+          totalDurationMinutes: 0,
+          estimatedCost: 0,
+          transportMode: 'unknown',
+          steps: [],
+          recommendations: [],
+          polyline: [],
+          error: 'Server Error: ${response.statusCode}',
+        );
+      }
+    } catch (e) {
+      return RoutePlanResponse(
+        success: false,
+        totalDistanceKm: 0,
+        totalDurationMinutes: 0,
+        estimatedCost: 0,
+        transportMode: 'unknown',
+        steps: [],
+        recommendations: [],
+        polyline: [],
+        error: 'Network Error: $e',
+      );
+    }
+  }
+
   /// Send an image to the vision agent to analyze.
   static Future<VisionResponse> analyzeMonument(XFile imageFile) async {
     try {

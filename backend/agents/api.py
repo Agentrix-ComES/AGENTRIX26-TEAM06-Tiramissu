@@ -36,6 +36,17 @@ class RouteDisruptionRequest(BaseModel):
     blocked_transport_mode: str
 
 
+class RoutePlanningRequest(BaseModel):
+    """Intelligent route planning request with user preferences."""
+    origin: str
+    destination: str
+    interests: list[str]
+    budget: float
+    time_available_minutes: int
+    disruptions: str | None = None
+    preferred_transport_mode: str = "any"
+
+
 class FreeTextDisruptionRequest(BaseModel):
     """Free-form disruption report — lets the LLM parse it."""
     message: str
@@ -157,6 +168,57 @@ async def route_pivot_freetext(body: FreeTextDisruptionRequest):
         return RouteResponse(success=False, error=str(exc))
     except Exception as exc:
         logger.exception("Unexpected error in route pivot freetext endpoint")
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+# ── Intelligent Route Planning endpoint ───────────────────────────────────
+
+
+@router.post("/route/plan", response_model=RouteResponse)
+async def route_plan_intelligent(body: RoutePlanningRequest):
+    """Plan an intelligent route based on user preferences.
+
+    The frontend sends origin, destination, interests, budget, time available,
+    and optional disruptions. The agent computes an optimal route with
+    recommendations for POIs, transport mode, and handles dynamic recalibration.
+    """
+    try:
+        # Build a comprehensive prompt for the LLM
+        interests_str = ", ".join(body.interests) if body.interests else "general sightseeing"
+        
+        user_input = (
+            f"Plan an optimal route from {body.origin} to {body.destination}.\\n"
+            f"- Interests: {interests_str}\\n"
+            f"- Budget: Rs {body.budget}\\n"
+            f"- Time available: {body.time_available_minutes} minutes\\n"
+            f"- Preferred transport: {body.preferred_transport_mode}\\n"
+        )
+        
+        if body.disruptions:
+            user_input += f"- Current disruptions/news: {body.disruptions}\\n"
+        
+        user_input += (
+            "Provide a detailed route plan including:\\n"
+            "1. Recommended transport mode(s)\\n"
+            "2. Turn-by-turn directions with distances\\n"
+            "3. Points of interest along the route matching the user's interests\\n"
+            "4. Estimated costs breakdown\\n"
+            "5. Cultural tips and negotiation scripts if needed\\n"
+            "6. Alternative options if disruptions affect the primary route"
+        )
+
+        result = await handle_route_pivot_from_text(user_input)
+        return RouteResponse(
+            success=True,
+            output=result["output"],
+            steps=result.get("intermediate_steps"),
+        )
+
+    except RuntimeError as exc:
+        logger.exception("Route planning endpoint failed")
+        return RouteResponse(success=False, error=str(exc))
+    except Exception as exc:
+        logger.exception("Unexpected error in route planning endpoint")
         raise HTTPException(status_code=500, detail=str(exc))
 
 

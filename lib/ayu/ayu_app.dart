@@ -7,17 +7,19 @@ import 'screens/auth_sheet.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/guardian_screen.dart';
 import 'screens/routes_screen.dart';
+import 'screens/smart_routes_screen.dart';
 import 'screens/alerts_screen.dart';
 import 'screens/profile_screen.dart';
 
 /// Screen names — mirrors the React SCREEN_DEPTH map.
-enum AyuScreen { welcome, dashboard, guardian, routes, alerts, profile }
+enum AyuScreen { welcome, dashboard, guardian, routes, smartRoutes, alerts, profile }
 
 const _depth = {
   AyuScreen.welcome: 0,
   AyuScreen.dashboard: 1,
   AyuScreen.guardian: 2,
   AyuScreen.routes: 2,
+  AyuScreen.smartRoutes: 2,
   AyuScreen.alerts: 2,
   AyuScreen.profile: 2,
 };
@@ -133,6 +135,9 @@ class _AyuNavigatorState extends State<AyuNavigator> {
 
       case AyuScreen.routes:
         return RoutesScreen(onBack: _goBack);
+
+      case AyuScreen.smartRoutes:
+        return SmartRoutesScreen(onBack: _goBack);
 
       case AyuScreen.alerts:
         return AlertsScreen(onBack: _goBack);
