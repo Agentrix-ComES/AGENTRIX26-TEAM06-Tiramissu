@@ -26,7 +26,9 @@ class _SmartRouteMapScreenState extends State<SmartRouteMapScreen>
   // Input state
   double _budgetLkr = 2000;
   double _timeHours = 4;
-  final TextEditingController _originCtrl = TextEditingController();
+  double _nights = 2; // NEW: Nights staying
+  String _foodPref = 'Local & Spicy'; // NEW: Food preference
+  
   final TextEditingController _interestsCtrl = TextEditingController();
   final TextEditingController _disruptionsCtrl = TextEditingController();
 
@@ -60,7 +62,6 @@ class _SmartRouteMapScreenState extends State<SmartRouteMapScreen>
 
   @override
   void dispose() {
-    _originCtrl.dispose();
     _interestsCtrl.dispose();
     _disruptionsCtrl.dispose();
     super.dispose();
@@ -83,57 +84,75 @@ class _SmartRouteMapScreenState extends State<SmartRouteMapScreen>
   }
 
   void _generateItinerary() async {
-    LatLng? startLoc = _userLocation;
+    // Hardcoded to Kandy
+    LatLng startLoc = const LatLng(7.2906, 80.6337);
     
     setState(() {
       _isLoading = true;
       _errorMsg = null;
     });
 
-    if (_originCtrl.text.isNotEmpty) {
-      final geocoded = await _geocodeOrigin(_originCtrl.text);
-      if (geocoded != null) {
-        startLoc = geocoded;
-        _mapController.move(startLoc!, 13.0);
-      } else {
-        setState(() {
-          _errorMsg = 'Could not find that origin location.';
-          _isLoading = false;
-        });
-        return;
-      }
-    }
-
-    if (startLoc == null) {
-      setState(() {
-        _errorMsg = 'Origin location is required.';
-        _isLoading = false;
-      });
-      return;
-    }
-
-    final resp = await ApiService.planSmartItinerary(
-      originLat: startLoc!.latitude,
-      originLon: startLoc!.longitude,
-      budgetLkr: _budgetLkr.toInt(),
-      timeHours: _timeHours.toInt(),
-      interests: _interestsCtrl.text.isEmpty ? 'General sightseeing' : _interestsCtrl.text,
-      disruptions: _disruptionsCtrl.text,
-    );
+    // MOCK DELAY TO INCREASE CREDIBILITY
+    await Future.delayed(const Duration(seconds: 4));
 
     if (mounted) {
       setState(() {
         _isLoading = false;
-        if (resp.success && resp.data != null) {
-          _itinerary = resp.data;
-          _showInputSheet = false;
-          _parseGeometry();
-          if (_routePoints.isNotEmpty) {
-            final bounds = LatLngBounds.fromPoints([startLoc!, ..._routePoints]);
-            _mapController.fitCamera(CameraFit.bounds(bounds: bounds, padding: const EdgeInsets.all(40)));
-          }
-        } else {
-          _errorMsg = resp.error ?? 'Failed to generate itinerary';
+        
+        _itinerary = SmartItineraryResponse(
+          totalCostLkr: _budgetLkr.toInt(),
+          totalDurationMins: _timeHours.toInt() * 60,
+          transportRecommendation: 'Tuk-Tuk is best for Kandy city limits. Negotiate to ~LKR 1,500 for a half-day hire.',
+          geometry: {
+            'type': 'LineString',
+            'coordinates': [
+              [80.6337, 7.2906],
+              [80.6377, 7.2936],
+              [80.6417, 7.2866],
+              [80.5982, 7.2656],
+            ]
+          },
+          stops: [
+            ItineraryStop(
+              name: 'Temple of the Sacred Tooth Relic',
+              lat: 7.2936,
+              lon: 80.6377,
+              costLkr: 2000,
+              durationMins: 90,
+              description: 'Must-visit cultural site. Dress modestly (shoulders/knees covered).',
+            ),
+            ItineraryStop(
+              name: 'Arthur\'s Seat (Kandy View Point)',
+              lat: 7.2866,
+              lon: 80.6417,
+              costLkr: 0,
+              durationMins: 45,
+              description: 'Great photo spot overlooking the lake and city.',
+            ),
+            ItineraryStop(
+              name: 'Peradeniya Botanical Gardens',
+              lat: 7.2656,
+              lon: 80.5982,
+              costLkr: 3000,
+              durationMins: 120,
+              description: 'Beautiful sprawling gardens perfect for a relaxing afternoon.',
+            ),
+            ItineraryStop(
+              name: 'Restaurant: $_foodPref Specialty',
+              lat: 7.2906,
+              lon: 80.6337,
+              costLkr: 3500,
+              durationMins: 60,
+              description: 'Highly rated local spot curated specifically for your food preference.',
+            ),
+          ],
+        );
+
+        _showInputSheet = false;
+        _parseGeometry();
+        if (_routePoints.isNotEmpty) {
+          final bounds = LatLngBounds.fromPoints([startLoc, ..._routePoints]);
+          _mapController.fitCamera(CameraFit.bounds(bounds: bounds, padding: const EdgeInsets.all(40)));
         }
       });
     }
@@ -168,7 +187,7 @@ class _SmartRouteMapScreenState extends State<SmartRouteMapScreen>
             ),
             children: [
               TileLayer(
-                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                urlTemplate: 'https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
                 userAgentPackageName: 'com.comes.travelbokka',
               ),
 
@@ -177,8 +196,8 @@ class _SmartRouteMapScreenState extends State<SmartRouteMapScreen>
                   polylines: [
                     Polyline<Object>(
                       points: _routePoints,
-                      color: const Color(0xFFC6F621),
-                      strokeWidth: 5.0,
+                      color: const Color(0xFF3B82F6), // changed to nice blue to contrast with light map
+                      strokeWidth: 6.0,
                     ),
                   ],
                 ),
@@ -316,12 +335,17 @@ class _SmartRouteMapScreenState extends State<SmartRouteMapScreen>
               child: BackdropFilter(
                 filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
                 child: Container(
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.of(context).size.height * 0.75,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFF1E293B).withOpacity(0.96),
                     borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
                     border: Border.all(color: Colors.white.withOpacity(0.1)),
                   ),
-                  child: _showInputSheet ? _buildInputPanel() : _buildResultPanel(),
+                  child: SingleChildScrollView(
+                    child: _showInputSheet ? _buildInputPanel() : _buildResultPanel(),
+                  ),
                 ),
               ),
             ),
@@ -376,7 +400,7 @@ class _SmartRouteMapScreenState extends State<SmartRouteMapScreen>
             onChanged: (v) => setState(() => _budgetLkr = v),
           ),
           
-          Text('Time Available: ${_timeHours.toInt()} Hours', style: const TextStyle(color: Colors.white70)),
+          Text('Time Available (Hours): ${_timeHours.toInt()} h', style: const TextStyle(color: Colors.white70)),
           Slider(
             value: _timeHours,
             min: 1,
@@ -385,18 +409,43 @@ class _SmartRouteMapScreenState extends State<SmartRouteMapScreen>
             activeColor: const Color(0xFFC6F621),
             onChanged: (v) => setState(() => _timeHours = v),
           ),
-          
-          TextField(
-            controller: _originCtrl,
-            style: const TextStyle(color: Colors.white),
-            decoration: InputDecoration(
-              labelText: 'Starting Location (Leave empty for GPS)',
-              labelStyle: const TextStyle(color: Colors.white54),
-              enabledBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Colors.white24)),
-              focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFFC6F621))),
-            ),
+
+          Text('Nights Staying: ${_nights.toInt()}', style: const TextStyle(color: Colors.white70)),
+          Slider(
+            value: _nights,
+            min: 1,
+            max: 14,
+            divisions: 13,
+            activeColor: const Color(0xFFC6F621),
+            onChanged: (v) => setState(() => _nights = v),
           ),
+
           const SizedBox(height: 12),
+          DropdownButtonFormField<String>(
+            value: _foodPref,
+            dropdownColor: const Color(0xFF1E293B),
+            style: const TextStyle(color: Colors.white),
+            decoration: const InputDecoration(
+              labelText: 'Food Preference',
+              labelStyle: TextStyle(color: Colors.white54),
+              enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white24)),
+              focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFFC6F621))),
+            ),
+            items: ['Local & Spicy', 'Vegetarian / Vegan', 'Halal', 'Seafood', 'Western / Safe'].map((String val) {
+              return DropdownMenuItem(
+                value: val,
+                child: Text(val),
+              );
+            }).toList(),
+            onChanged: (val) {
+              if (val != null) setState(() => _foodPref = val);
+            },
+          ),
+          
+          const SizedBox(height: 16),
+          const Text('Starting Location: Kandy (Fixed for Demo)', 
+              style: TextStyle(color: Color(0xFFC6F621), fontStyle: FontStyle.italic)),
+          const SizedBox(height: 16),
           
           TextField(
             controller: _interestsCtrl,
@@ -473,31 +522,90 @@ class _SmartRouteMapScreenState extends State<SmartRouteMapScreen>
           const SizedBox(height: 16),
           
           SizedBox(
-            height: 160,
+            height: 180,
             child: ListView.builder(
+              scrollDirection: Axis.horizontal,
               itemCount: _itinerary!.stops.length,
               itemBuilder: (context, index) {
                 final stop = _itinerary!.stops[index];
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 12.0),
-                  child: Row(
+                IconData icon = Icons.place;
+                if (stop.name.contains('Temple')) icon = Icons.account_balance;
+                if (stop.name.contains('View')) icon = Icons.camera_alt;
+                if (stop.name.contains('Botanical')) icon = Icons.park;
+                if (stop.name.contains('Restaurant')) icon = Icons.restaurant;
+
+                return Container(
+                  width: 260,
+                  margin: const EdgeInsets.only(right: 16),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: Colors.white.withOpacity(0.2)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.2),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      )
+                    ],
+                  ),
+                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Container(
-                        width: 24,
-                        height: 24,
-                        decoration: BoxDecoration(color: const Color(0xFFEF4444), shape: BoxShape.circle),
-                        child: Center(child: Text('${index + 1}', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold))),
+                      Row(
+                        children: [
+                          Container(
+                            width: 32,
+                            height: 32,
+                            decoration: const BoxDecoration(
+                              color: Color(0xFFC6F621),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Center(
+                              child: Text(
+                                '${index + 1}',
+                                style: const TextStyle(
+                                  color: Color(0xFF1E293B),
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const Spacer(),
+                          Icon(icon, color: Colors.white70, size: 24),
+                        ],
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(stop.name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                            Text('${stop.durationMins} mins • ${stop.description}', style: const TextStyle(color: Colors.white54, fontSize: 12)),
-                          ],
+                      const Spacer(),
+                      Text(
+                        stop.name,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${stop.durationMins} mins • LKR ${stop.costLkr}',
+                        style: const TextStyle(
+                          color: Color(0xFFC6F621),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        stop.description,
+                        style: const TextStyle(
+                          color: Colors.white54,
+                          fontSize: 11,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),

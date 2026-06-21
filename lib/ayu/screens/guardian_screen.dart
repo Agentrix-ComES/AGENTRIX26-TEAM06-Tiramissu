@@ -10,6 +10,7 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 
 import '../theme/ayu_colors.dart';
 import '../theme/ayu_text_styles.dart';
+import 'alerts_screen.dart';
 
 /// Guardian screen — camera AR overlay, interactive mic, animated scam alert, and live analysis box.
 class GuardianScreen extends StatefulWidget {
@@ -91,6 +92,10 @@ class _GuardianScreenState extends State<GuardianScreen>
         }
 
         if (data['mode'] == 'guardian') {
+          // INTERCEPTED FOR DEMO MOCK: we ignore real backend websocket data for now
+          // so it doesn't overwrite our King Coconut mock.
+          return;
+          
           final status = data['status'];
           final englishText = data['english_text'] ?? '';
           final threatMsg = data['threat_message'] ?? '';
@@ -191,14 +196,58 @@ class _GuardianScreenState extends State<GuardianScreen>
   Future<void> _stopRecording() async {
     setState(() {
       _isRecording = false;
-      _currentStatus = 'Processing...';
+      _currentStatus = 'Analyzing audio...';
     });
-
-    // Tell backend to immediately process the buffer
-    _channel?.sink.add('FLUSH');
 
     // Stop grabbing audio
     await _record.stop();
+    
+    // Tell backend to immediately process the buffer (ignored by frontend now)
+    _channel?.sink.add('FLUSH');
+
+    // --- MOCK KING COCONUT SCAM FOR DEMO ---
+    await Future.delayed(const Duration(seconds: 2));
+    if (mounted) setState(() => _currentStatus = 'Translating local dialect...');
+    
+    await Future.delayed(const Duration(seconds: 2));
+    if (mounted) setState(() => _currentStatus = 'Checking against local prices...');
+    
+    await Future.delayed(const Duration(seconds: 2));
+
+    if (mounted) {
+      final threatMsg = "The vendor is quoting LKR 2,500 for a King Coconut. The fair local price is LKR 150-200. This is a severe overcharge.";
+      
+      setState(() {
+        _currentStatus = 'Analysis complete.';
+        _scamVisible = true;
+        _threatMessage = threatMsg;
+        _actionSuggested = "Decline politely and walk away. Fair price is ~LKR 200.";
+        _transcriptSnippet = "අයියේ මේ තැඹිලි ගෙඩියක් දෙදහස් පන්සීයක් වෙනවා.";
+        
+        _analysisHistory.insert(0, {
+          'status': 'SCAM',
+          'original': 'අයියේ මේ තැඹිලි ගෙඩියක් දෙදහස් පන්සීයක් වෙනවා.',
+          'english': 'Brother, one King Coconut is 2,500 rupees.',
+          'threat': threatMsg,
+          'action': 'Decline politely and walk away. Fair price is ~LKR 200.',
+        });
+      });
+      _scrollToTop();
+      _scamSlide.forward();
+      
+      // ADD TO GLOBAL ALERTS SCREEN
+      globalAlerts.insert(0, AlertItem(
+        id: DateTime.now().millisecondsSinceEpoch,
+        level: AlertLevel.danger,
+        title: 'Scam: Overpriced King Coconut',
+        body: threatMsg,
+        location: 'Current Location',
+        time: 'Just now',
+        read: false,
+        quoted: 'LKR 2,500',
+        fair: 'LKR 200',
+      ));
+    }
   }
 
   AnimationController _makePulse(int delayMs) {

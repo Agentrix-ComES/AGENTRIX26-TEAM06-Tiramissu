@@ -33,7 +33,7 @@ class AyuApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'AYU — Sri Lanka Travel Companion',
+      title: 'Travel Bokka — Sri Lanka Travel Companion',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,

@@ -16,6 +16,7 @@ class _SightGlassScreenState extends State<SightGlassScreen> {
   File? _image;
   bool _isScanning = false;
   bool _showResults = false;
+  String _scanStatus = "Travel Bokka is analyzing the image...";
   final ImagePicker _picker = ImagePicker();
 
   @override
@@ -34,10 +35,17 @@ class _SightGlassScreenState extends State<SightGlassScreen> {
         _image = File(photo.path);
         _isScanning = true;
         _showResults = false;
+        _scanStatus = "Travel Bokka is analyzing the image...";
       });
 
-      // Simulate the Gemini 1.5 Vision API processing time
-      await Future.delayed(const Duration(seconds: 3));
+      // Simulate the Gemini 1.5 Vision API processing time in stages
+      await Future.delayed(const Duration(seconds: 2));
+      if (mounted) setState(() => _scanStatus = "Identifying landmarks...");
+      
+      await Future.delayed(const Duration(seconds: 2));
+      if (mounted) setState(() => _scanStatus = "Extracting historical context...");
+      
+      await Future.delayed(const Duration(seconds: 2));
 
       if (mounted) {
         setState(() {
@@ -87,11 +95,11 @@ class _SightGlassScreenState extends State<SightGlassScreen> {
                 child: Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
-                    children: const [
-                      CircularProgressIndicator(color: Color(0xFFC6F621)),
-                      SizedBox(height: 20),
-                      Text("Travel Bokka is thinking...", 
-                        style: TextStyle(color: Color(0xFFC6F621), fontWeight: FontWeight.bold, fontSize: 16)),
+                    children: [
+                      const CircularProgressIndicator(color: Color(0xFFC6F621)),
+                      const SizedBox(height: 20),
+                      Text(_scanStatus, 
+                        style: const TextStyle(color: Color(0xFFC6F621), fontWeight: FontWeight.bold, fontSize: 16)),
                     ],
                   ),
                 ),

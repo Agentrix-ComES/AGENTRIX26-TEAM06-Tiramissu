@@ -67,11 +67,12 @@ class _WelcomeScreenState extends State<WelcomeScreen>
       fit: StackFit.expand,
       children: [
         // Full-bleed hero image
-        Image.network(
-          'https://images.unsplash.com/photo-1550754706-432b118ee3d7?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080',
+        Image.asset(
+          'assets/images/hostess.png',
           fit: BoxFit.cover,
+          alignment: Alignment.topCenter,
           errorBuilder: (_, __, ___) =>
-              Container(color: const Color(0xFF2D4A30)),
+              Container(color: const Color(0xFF004953)), // Teal background fallback
         ),
         // Gradient overlay
         Container(
@@ -100,12 +101,12 @@ class _WelcomeScreenState extends State<WelcomeScreen>
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'AYU',
+                  'TRAVEL BOKKA',
                   style: AyuText.label(
                     color: Colors.white.withOpacity(0.9),
-                    size: 12,
-                    weight: FontWeight.w600,
-                    letterSpacing: 4,
+                    size: 14,
+                    weight: FontWeight.w700,
+                    letterSpacing: 2,
                   ),
                 ),
                 Row(
@@ -148,10 +149,10 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                       padding: const EdgeInsets.symmetric(
                           horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
-                        color: AyuColors.limeDim,
+                        color: const Color(0xFF004953).withOpacity(0.8), // Teal Dim
                         borderRadius: BorderRadius.circular(50),
                         border: Border.all(
-                            color: AyuColors.lime.withOpacity(0.3)),
+                            color: const Color(0xFF00B0B9).withOpacity(0.4)), // Bright Teal
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -161,7 +162,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                           Text(
                             'Your AI Travel Companion',
                             style: AyuText.label(
-                              color: AyuColors.lime,
+                              color: const Color(0xFFFDB913), // Gold
                               size: 12,
                               weight: FontWeight.w600,
                               letterSpacing: 0.04 * 12,
@@ -260,7 +261,7 @@ class _PulseDotState extends State<_PulseDot>
         width: 8,
         height: 8,
         decoration: const BoxDecoration(
-          color: AyuColors.lime,
+          color: Color(0xFFFDB913), // Gold
           shape: BoxShape.circle,
         ),
       ),
@@ -326,11 +327,11 @@ class _GetStartedButtonState extends State<_GetStartedButton>
                 width: 40,
                 height: 40,
                 decoration: const BoxDecoration(
-                  color: AyuColors.lime,
+                  color: Color(0xFFFDB913), // Gold
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(Icons.arrow_forward,
-                    size: 18, color: AyuColors.navy),
+                    size: 18, color: Color(0xFF004953)), // Teal Navy
               ),
             ],
           ),

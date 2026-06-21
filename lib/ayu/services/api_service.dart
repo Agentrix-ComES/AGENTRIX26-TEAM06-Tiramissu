@@ -1,11 +1,12 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
+import 'dart:io' show Platform;
 import '../models/api_responses.dart';
 
 class ApiService {
-  // Use 127.0.0.1 with `adb reverse tcp:8000 tcp:8000` for physical devices.
-  static const String _baseUrl = 'http://127.0.0.1:8000/api/ai';
+  static String get _host => Platform.isAndroid ? '10.0.2.2' : '127.0.0.1';
+  static String get _baseUrl => 'http://$_host:8000/api/ai';
 
   /// Pivot route via structured disruption.
   static Future<RouteResponse> pivotRoute({

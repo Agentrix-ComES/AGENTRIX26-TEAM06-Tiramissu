@@ -54,6 +54,9 @@ List<AlertItem> _initialAlerts() => [
   AlertItem(id: 7, level: AlertLevel.safe, title: 'Route Saved Successfully', body: 'Your route to Sigiriya Rock Fortress has been saved. Estimated travel: 3 hrs 40 min.', location: 'Kandy → Sigiriya', time: '2 days ago', read: true),
 ];
 
+// Global alerts state for cross-screen demo functionality
+final List<AlertItem> globalAlerts = _initialAlerts();
+
 /// Alerts & Scams screen — filterable expandable list.
 class AlertsScreen extends StatefulWidget {
   const AlertsScreen({super.key, required this.onBack});
@@ -64,7 +67,7 @@ class AlertsScreen extends StatefulWidget {
 }
 
 class _AlertsScreenState extends State<AlertsScreen> {
-  late final List<AlertItem> _alerts = _initialAlerts();
+  List<AlertItem> get _alerts => globalAlerts;
   String _filter = 'all';
   int? _expanded = 1;
 
